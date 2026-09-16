@@ -70,7 +70,7 @@ After deployment:
 From the **project root**:
 
 ```bash
-cd workflow-capitare && bun install && cd ..
+bun install --cwd ./workflow-capitare
 ```
 
 Set environment variables:
