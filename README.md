@@ -67,13 +67,20 @@ After deployment:
 
 ### CRE workflow
 
-From the **project root**:
+Copy the env template and fill in your values:
+
+```bash
+cp .env.example .env
+# edit .env and set CRE_ETH_PRIVATE_KEY
+```
+
+Install dependencies from the **project root**:
 
 ```bash
 bun install --cwd ./workflow-capitare
 ```
 
-Set environment variables:
+Set CRE secrets (stored in the DON, not locally):
 ```
 CAPITARE_OBSERVER_KEY=<from observer-api.env>
 CRE_TRANSACTION_PRIVATE_KEY=<CRE wallet private key>
