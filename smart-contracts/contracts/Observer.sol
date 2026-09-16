@@ -19,6 +19,13 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
  */
 contract Observer is AccessControl {
 
+    error FundAlreadyRegistered();
+    error ActionAlreadyAnchored();
+    error OrderAlreadyAnchored();
+    error NotFound();
+    error InvalidRange();
+    error OutOfBounds();
+
     string public constant VERSION = "1.0.0";
 
     bytes32 public constant REPORTER_ROLE = keccak256("REPORTER_ROLE");
@@ -163,7 +170,7 @@ contract Observer is AccessControl {
     function registerFund(
         FundInput calldata f
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(_fundIdToIndex[f.fundId] == 0, "Observer: fund already registered");
+        if (_fundIdToIndex[f.fundId] != 0) revert FundAlreadyRegistered();
         _funds.push(FundInfo({
             fundId: f.fundId, name: f.name,
             xdcNetwork: f.xdcNetwork, xdcFidcManager: f.xdcFidcManager,
@@ -195,7 +202,7 @@ contract Observer is AccessControl {
         string     calldata txHash
     ) external onlyRole(REPORTER_ROLE) returns (uint256 recordId) {
         bytes32 txKey = keccak256(abi.encodePacked(network, txHash));
-        require(!_txAnchored[txKey], "Observer: action already anchored");
+        if (_txAnchored[txKey]) revert ActionAlreadyAnchored();
         _txAnchored[txKey] = true;
         recordId = _actions.length;
         _actions.push(ActionRecord({
@@ -217,7 +224,7 @@ contract Observer is AccessControl {
     function reportSettlement(
         SettlementInput calldata s
     ) external onlyRole(REPORTER_ROLE) returns (uint256 recordId) {
-        require(!_orderAnchored[s.orderId], "Observer: order already anchored");
+        if (_orderAnchored[s.orderId]) revert OrderAlreadyAnchored();
         _orderAnchored[s.orderId] = true;
         recordId = _settlements.length;
         _settlements.push(SettlementRecord({
@@ -264,12 +271,12 @@ contract Observer is AccessControl {
 
     function getLatestSettlement(bytes32 intentHash) external view returns (SettlementRecord memory) {
         uint256 id = latestSettlementId[intentHash];
-        require(id != 0, "Observer: not found");
+        if (id == 0) revert NotFound();
         return _settlements[id - 1];
     }
 
     function getSettlement(uint256 recordId) external view returns (SettlementRecord memory) {
-        require(recordId < _settlements.length, "Observer: not found");
+        if (recordId >= _settlements.length) revert NotFound();
         return _settlements[recordId];
     }
 
@@ -285,8 +292,8 @@ contract Observer is AccessControl {
     }
 
     function getSettlements(uint256 fromIndex, uint256 toIndex) external view returns (SettlementRecord[] memory result) {
-        require(fromIndex <= toIndex, "Observer: invalid range");
-        require(toIndex < _settlements.length, "Observer: out of bounds");
+        if (fromIndex > toIndex) revert InvalidRange();
+        if (toIndex >= _settlements.length) revert OutOfBounds();
         uint256 n = toIndex - fromIndex + 1;
         result = new SettlementRecord[](n);
         for (uint256 i = 0; i < n; i++) result[i] = _settlements[fromIndex + i];
@@ -299,7 +306,7 @@ contract Observer is AccessControl {
     }
 
     function getAction(uint256 recordId) external view returns (ActionRecord memory) {
-        require(recordId < _actions.length, "Observer: not found");
+        if (recordId >= _actions.length) revert NotFound();
         return _actions[recordId];
     }
 
@@ -311,8 +318,8 @@ contract Observer is AccessControl {
     }
 
     function getActions(uint256 fromIndex, uint256 toIndex) external view returns (ActionRecord[] memory result) {
-        require(fromIndex <= toIndex, "Observer: invalid range");
-        require(toIndex < _actions.length, "Observer: out of bounds");
+        if (fromIndex > toIndex) revert InvalidRange();
+        if (toIndex >= _actions.length) revert OutOfBounds();
         uint256 n = toIndex - fromIndex + 1;
         result = new ActionRecord[](n);
         for (uint256 i = 0; i < n; i++) result[i] = _actions[fromIndex + i];
@@ -325,13 +332,13 @@ contract Observer is AccessControl {
     }
 
     function getFund(uint256 idx) external view returns (FundInfo memory) {
-        require(idx < _funds.length, "Observer: not found");
+        if (idx >= _funds.length) revert NotFound();
         return _funds[idx];
     }
 
     function getFundById(string calldata fundId) external view returns (FundInfo memory) {
         uint256 idx = _fundIdToIndex[fundId];
-        require(idx != 0, "Observer: fund not found");
+        if (idx == 0) revert NotFound();
         return _funds[idx - 1];
     }
 
@@ -343,8 +350,8 @@ contract Observer is AccessControl {
     }
 
     function getFunds(uint256 fromIndex, uint256 toIndex) external view returns (FundInfo[] memory result) {
-        require(fromIndex <= toIndex, "Observer: invalid range");
-        require(toIndex < _funds.length, "Observer: out of bounds");
+        if (fromIndex > toIndex) revert InvalidRange();
+        if (toIndex >= _funds.length) revert OutOfBounds();
         uint256 n = toIndex - fromIndex + 1;
         result = new FundInfo[](n);
         for (uint256 i = 0; i < n; i++) result[i] = _funds[fromIndex + i];
