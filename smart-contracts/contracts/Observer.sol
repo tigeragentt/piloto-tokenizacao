@@ -50,7 +50,7 @@ contract Observer is AccessControl {
     }
 
     FundInfo[]                     private _funds;
-    mapping(string => uint256)     private _fundIdToIndex;  // 1-based; 0 = not registered
+    mapping(string => uint256)     private _fundIdToIndex;   // 1-based; 0 = not registered
 
     // ─── General Action Log ─────────────────────────────────────────────────
 
@@ -84,6 +84,7 @@ contract Observer is AccessControl {
     }
 
     ActionRecord[] private _actions;
+    mapping(bytes32 => bool)       private _txAnchored;      // keccak256(network ++ txHash) → seen
 
     // ─── Settlement Records ─────────────────────────────────────────────────
 
@@ -114,8 +115,9 @@ contract Observer is AccessControl {
     }
 
     SettlementRecord[] private _settlements;
+    mapping(string => bool)        private _orderAnchored;   // orderId → seen
 
-    // intentHash → 1-based index into _settlements (latest record for this order)
+    // intentHash → 1-based index into _settlements (workflow lookup key)
     mapping(bytes32 => uint256) public latestSettlementId;
 
     // ─── Events ─────────────────────────────────────────────────────────────
@@ -161,28 +163,16 @@ contract Observer is AccessControl {
     function registerFund(
         FundInput calldata f
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        uint256 existing = _fundIdToIndex[f.fundId];
-        uint256 emitIdx;
-        if (existing == 0) {
-            _funds.push(FundInfo({
-                fundId: f.fundId, name: f.name,
-                xdcNetwork: f.xdcNetwork, xdcFidcManager: f.xdcFidcManager,
-                xdcStable: f.xdcStable, xdcEscrowFactory: f.xdcEscrowFactory,
-                xrplNetwork: f.xrplNetwork, xrplIssuer: f.xrplIssuer,
-                debentureCurrency: f.debentureCurrency
-            }));
-            _fundIdToIndex[f.fundId] = _funds.length;
-            emitIdx = _funds.length - 1;
-        } else {
-            FundInfo storage info = _funds[existing - 1];
-            info.name = f.name;
-            info.xdcFidcManager = f.xdcFidcManager;
-            info.xdcStable = f.xdcStable;
-            info.xdcEscrowFactory = f.xdcEscrowFactory;
-            info.xrplIssuer = f.xrplIssuer;
-            emitIdx = existing - 1;
-        }
-        emit FundRegistered(emitIdx, f.fundId, f.name);
+        require(_fundIdToIndex[f.fundId] == 0, "Observer: fund already registered");
+        _funds.push(FundInfo({
+            fundId: f.fundId, name: f.name,
+            xdcNetwork: f.xdcNetwork, xdcFidcManager: f.xdcFidcManager,
+            xdcStable: f.xdcStable, xdcEscrowFactory: f.xdcEscrowFactory,
+            xrplNetwork: f.xrplNetwork, xrplIssuer: f.xrplIssuer,
+            debentureCurrency: f.debentureCurrency
+        }));
+        _fundIdToIndex[f.fundId] = _funds.length;
+        emit FundRegistered(_funds.length - 1, f.fundId, f.name);
     }
 
     // ─── Reporter ───────────────────────────────────────────────────────────
@@ -204,6 +194,9 @@ contract Observer is AccessControl {
         uint256             amount,
         string     calldata txHash
     ) external onlyRole(REPORTER_ROLE) returns (uint256 recordId) {
+        bytes32 txKey = keccak256(abi.encodePacked(network, txHash));
+        require(!_txAnchored[txKey], "Observer: action already anchored");
+        _txAnchored[txKey] = true;
         recordId = _actions.length;
         _actions.push(ActionRecord({
             network: network, action: action,
@@ -215,16 +208,17 @@ contract Observer is AccessControl {
     }
 
     /**
-     * @notice Anchor a Capitare FIDC settlement proof on-chain.
-     *         May be called multiple times for the same intentHash — each call
-     *         appends a new record (allowing progress from delivery → full settlement).
-     *         latestSettlementId[intentHash] always points to the most recent record.
+     * @notice Anchor a Capitare FIDC settlement proof on-chain. Each orderId may only
+     *         be anchored once. latestSettlementId[intentHash] provides a bytes32 lookup
+     *         for the CRE workflow.
      *
      * @param s  SettlementInput struct — packs all nine fields to avoid stack-too-deep.
      */
     function reportSettlement(
         SettlementInput calldata s
     ) external onlyRole(REPORTER_ROLE) returns (uint256 recordId) {
+        require(!_orderAnchored[s.orderId], "Observer: order already anchored");
+        _orderAnchored[s.orderId] = true;
         recordId = _settlements.length;
         _settlements.push(SettlementRecord({
             orderId:             s.orderId,
@@ -247,11 +241,26 @@ contract Observer is AccessControl {
         );
     }
 
-    // ─── Settlement Views ───────────────────────────────────────────────────
+    // ─── Existence Checks ───────────────────────────────────────────────────
 
+    function isFundRegistered(string calldata fundId) external view returns (bool) {
+        return _fundIdToIndex[fundId] != 0;
+    }
+
+    function isActionAnchored(string calldata network, string calldata txHash) external view returns (bool) {
+        return _txAnchored[keccak256(abi.encodePacked(network, txHash))];
+    }
+
+    function isOrderAnchored(string calldata orderId) external view returns (bool) {
+        return _orderAnchored[orderId];
+    }
+
+    // intentHash-based check kept for CRE workflow backward compatibility
     function isSettlementAnchored(bytes32 intentHash) external view returns (bool) {
         return latestSettlementId[intentHash] != 0;
     }
+
+    // ─── Settlement Views ───────────────────────────────────────────────────
 
     function getLatestSettlement(bytes32 intentHash) external view returns (SettlementRecord memory) {
         uint256 id = latestSettlementId[intentHash];

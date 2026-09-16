@@ -43,6 +43,30 @@ export const OBSERVER_ABI = [
     stateMutability: 'view',
   },
   {
+    name: 'isFundRegistered',
+    type: 'function',
+    inputs: [{ name: 'fundId', type: 'string' }],
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    name: 'isActionAnchored',
+    type: 'function',
+    inputs: [
+      { name: 'network', type: 'string' },
+      { name: 'txHash',  type: 'string' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    name: 'isOrderAnchored',
+    type: 'function',
+    inputs: [{ name: 'orderId', type: 'string' }],
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
     name: 'isSettlementAnchored',
     type: 'function',
     inputs: [{ name: 'intentHash', type: 'bytes32' }],

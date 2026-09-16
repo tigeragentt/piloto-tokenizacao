@@ -32,6 +32,13 @@ export type Config = {
 
 const OBSERVER_ABI = [
   {
+    name: "isOrderAnchored",
+    type: "function",
+    inputs: [{ name: "orderId", type: "string" }],
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view",
+  },
+  {
     name: "isSettlementAnchored",
     type: "function",
     inputs: [{ name: "intentHash", type: "bytes32" }],
@@ -202,18 +209,22 @@ const submitTx = (
 const isAlreadyAnchored = (
   runtime: Runtime<Config>,
   httpClient: HTTPClient,
-  intentHash: `0x${string}`,
+  orderId: string,
 ): boolean => {
   const { sepoliaRpcUrl, observerAddress } = runtime.config
   const callData = encodeFunctionData({
     abi: OBSERVER_ABI,
-    functionName: "isSettlementAnchored",
-    args: [intentHash],
+    functionName: "isOrderAnchored",
+    args: [orderId],
   })
   const raw = JSON.parse(
     rpcCall(runtime, httpClient, sepoliaRpcUrl, "eth_call", [{ to: observerAddress, data: callData }, "latest"], 50)
   ) as string
-  return raw !== "0x" && raw !== ZERO_BYTES32
+  return decodeFunctionResult({
+    abi: OBSERVER_ABI,
+    functionName: "isOrderAnchored",
+    data: raw as `0x${string}`,
+  }) as boolean
 }
 
 // ─── Anchor settlement ────────────────────────────────────────────────────────
@@ -304,7 +315,7 @@ const scanAndAnchor = async (runtime: Runtime<Config>): Promise<ScanResult> => {
     try {
       const intentHashBytes32 = toBytes32(order.intentHash)
 
-      if (observerAddress && isAlreadyAnchored(runtime, httpClient, intentHashBytes32)) {
+      if (observerAddress && isAlreadyAnchored(runtime, httpClient, order.id)) {
         runtime.log(`Order ${order.id}: already anchored — skip`)
         result.skipped++
         continue
