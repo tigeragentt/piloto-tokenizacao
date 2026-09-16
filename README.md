@@ -37,6 +37,8 @@ escrow proxy (per-order, EIP-1167)
 ```
 smart-contracts/         Observer.sol (Hardhat, Sepolia)
 workflow-capitare/       CRE workflow: polls Capitare API, anchors proofs on-chain
+frontend/                React dashboard (Vite) — Dashboard, Orders, Observer, XDC, CRE pages
+project.yaml             CRE project config (Sepolia chain selector + RPC)
 secrets.yaml             CRE secret name → env var mapping (no actual values)
 ```
 
@@ -65,9 +67,10 @@ After deployment:
 
 ### CRE workflow
 
+From the **project root**:
+
 ```bash
-cd workflow-capitare
-bun install
+cd workflow-capitare && bun install && cd ..
 ```
 
 Set environment variables:
