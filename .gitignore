@@ -2,5 +2,8 @@ node_modules/
 artifacts/
 cache/
 typechain-types/
+dist/
+*.wasm
+bun.lockb
 .env
 *.env
