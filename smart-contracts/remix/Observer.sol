@@ -3,7 +3,7 @@ pragma solidity 0.8.36;
 
 import "https://raw.githubusercontent.com/OpenZeppelin/openzeppelin-contracts/v5.2.0/contracts/access/AccessControl.sol";
 
-contract Observer is AccessControl {
+contract ObserverTest is AccessControl {
 
     string public constant VERSION = "1.0.0";
 
@@ -115,7 +115,7 @@ contract Observer is AccessControl {
 
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        // REPORTER_ROLE must be granted explicitly to the CRE wallet after deployment
+        _grantRole(REPORTER_ROLE, msg.sender);
     }
 
     // ─── Admin ──────────────────────────────────────────────────────────────
