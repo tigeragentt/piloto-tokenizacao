@@ -25,6 +25,18 @@ contract Observer is AccessControl {
 
     // ─── Fund Registry ──────────────────────────────────────────────────────
 
+    struct FundInput {
+        string  fundId;
+        string  name;
+        string  xdcNetwork;
+        address xdcFidcManager;
+        address xdcStable;
+        address xdcEscrowFactory;
+        string  xrplNetwork;
+        string  xrplIssuer;
+        string  debentureCurrency;
+    }
+
     struct FundInfo {
         string  fundId;              // Capitare fund UUID
         string  name;                // e.g. "Horizonte Crédito Multirrede FIDC — Piloto XDC"
@@ -74,6 +86,18 @@ contract Observer is AccessControl {
     ActionRecord[] private _actions;
 
     // ─── Settlement Records ─────────────────────────────────────────────────
+
+    struct SettlementInput {
+        string   orderId;
+        bytes32  intentHash;
+        string   progress;
+        bool     technicalCompleted;
+        bool     accountingCompleted;
+        bytes32  deliveryProofSHA256;
+        bytes32  resolutionHash;
+        string   sourceNetwork;
+        string   destinationNetwork;
+    }
 
     struct SettlementRecord {
         string   orderId;              // Capitare order UUID
@@ -135,38 +159,30 @@ contract Observer is AccessControl {
     // ─── Admin ──────────────────────────────────────────────────────────────
 
     function registerFund(
-        string  calldata fundId,
-        string  calldata name,
-        string  calldata xdcNetwork,
-        address          xdcFidcManager,
-        address          xdcStable,
-        address          xdcEscrowFactory,
-        string  calldata xrplNetwork,
-        string  calldata xrplIssuer,
-        string  calldata debentureCurrency
+        FundInput calldata f
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        uint256 existing = _fundIdToIndex[fundId];
+        uint256 existing = _fundIdToIndex[f.fundId];
         uint256 emitIdx;
         if (existing == 0) {
             _funds.push(FundInfo({
-                fundId: fundId, name: name,
-                xdcNetwork: xdcNetwork, xdcFidcManager: xdcFidcManager,
-                xdcStable: xdcStable, xdcEscrowFactory: xdcEscrowFactory,
-                xrplNetwork: xrplNetwork, xrplIssuer: xrplIssuer,
-                debentureCurrency: debentureCurrency
+                fundId: f.fundId, name: f.name,
+                xdcNetwork: f.xdcNetwork, xdcFidcManager: f.xdcFidcManager,
+                xdcStable: f.xdcStable, xdcEscrowFactory: f.xdcEscrowFactory,
+                xrplNetwork: f.xrplNetwork, xrplIssuer: f.xrplIssuer,
+                debentureCurrency: f.debentureCurrency
             }));
-            _fundIdToIndex[fundId] = _funds.length;
+            _fundIdToIndex[f.fundId] = _funds.length;
             emitIdx = _funds.length - 1;
         } else {
             FundInfo storage info = _funds[existing - 1];
-            info.name = name;
-            info.xdcFidcManager = xdcFidcManager;
-            info.xdcStable = xdcStable;
-            info.xdcEscrowFactory = xdcEscrowFactory;
-            info.xrplIssuer = xrplIssuer;
+            info.name = f.name;
+            info.xdcFidcManager = f.xdcFidcManager;
+            info.xdcStable = f.xdcStable;
+            info.xdcEscrowFactory = f.xdcEscrowFactory;
+            info.xrplIssuer = f.xrplIssuer;
             emitIdx = existing - 1;
         }
-        emit FundRegistered(emitIdx, fundId, name);
+        emit FundRegistered(emitIdx, f.fundId, f.name);
     }
 
     // ─── Reporter ───────────────────────────────────────────────────────────
@@ -204,46 +220,30 @@ contract Observer is AccessControl {
      *         appends a new record (allowing progress from delivery → full settlement).
      *         latestSettlementId[intentHash] always points to the most recent record.
      *
-     * @param orderId              Capitare order UUID.
-     * @param intentHash           bytes32 correlation key (prepend 0x to Capitare hex).
-     * @param progress             Capitare progress string, e.g. "ACQUIRED_WITH_LOCK".
-     * @param technicalCompleted   technicalSettlementCompleted from /settlement endpoint.
-     * @param accountingCompleted  accountingCompleted from /settlement endpoint.
-     * @param deliveryProofSHA256  sha256 of delivery-proof manifest (bytes32, 0x0 if unavailable).
-     * @param resolutionHash       keccak256 of resolution struct; must match LockResolved on XDC.
-     * @param sourceNetwork        e.g. "eip155:51".
-     * @param destinationNetwork   e.g. "xrpl:testnet".
+     * @param s  SettlementInput struct — packs all nine fields to avoid stack-too-deep.
      */
     function reportSettlement(
-        string   calldata orderId,
-        bytes32           intentHash,
-        string   calldata progress,
-        bool              technicalCompleted,
-        bool              accountingCompleted,
-        bytes32           deliveryProofSHA256,
-        bytes32           resolutionHash,
-        string   calldata sourceNetwork,
-        string   calldata destinationNetwork
+        SettlementInput calldata s
     ) external onlyRole(REPORTER_ROLE) returns (uint256 recordId) {
         recordId = _settlements.length;
         _settlements.push(SettlementRecord({
-            orderId: orderId,
-            intentHash: intentHash,
-            progress: progress,
-            technicalCompleted: technicalCompleted,
-            accountingCompleted: accountingCompleted,
-            deliveryProofSHA256: deliveryProofSHA256,
-            resolutionHash: resolutionHash,
-            sourceNetwork: sourceNetwork,
-            destinationNetwork: destinationNetwork,
-            reportedAt: block.timestamp,
-            blockNumber: block.number
+            orderId:             s.orderId,
+            intentHash:          s.intentHash,
+            progress:            s.progress,
+            technicalCompleted:  s.technicalCompleted,
+            accountingCompleted: s.accountingCompleted,
+            deliveryProofSHA256: s.deliveryProofSHA256,
+            resolutionHash:      s.resolutionHash,
+            sourceNetwork:       s.sourceNetwork,
+            destinationNetwork:  s.destinationNetwork,
+            reportedAt:          block.timestamp,
+            blockNumber:         block.number
         }));
-        latestSettlementId[intentHash] = recordId + 1;
+        latestSettlementId[s.intentHash] = recordId + 1;
         emit SettlementReported(
-            recordId, intentHash, orderId, progress,
-            technicalCompleted, accountingCompleted,
-            deliveryProofSHA256, resolutionHash, block.timestamp
+            recordId, s.intentHash, s.orderId, s.progress,
+            s.technicalCompleted, s.accountingCompleted,
+            s.deliveryProofSHA256, s.resolutionHash, block.timestamp
         );
     }
 
