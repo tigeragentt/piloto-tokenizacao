@@ -1,12 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.36;
 
-// ─── Remix compiler settings ────────────────────────────────────────────────
-// Compiler:    0.8.36
-// EVM version: cancun
-// Optimizer:   disabled
-// ────────────────────────────────────────────────────────────────────────────
-
 import "https://raw.githubusercontent.com/OpenZeppelin/openzeppelin-contracts/v5.2.0/contracts/access/AccessControl.sol";
 
 contract Observer is AccessControl {
