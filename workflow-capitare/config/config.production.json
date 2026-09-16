@@ -1,0 +1,9 @@
+{
+  "capitareBaseUrl": "https://TODO_PRODUCTION_CAPITARE_URL/v1/external/observer",
+  "capitareClientId": "TODO_PRODUCTION_CLIENT_ID",
+  "fundId": "TODO_PRODUCTION_FUND_ID",
+  "schedule": "0 */5 * * * *",
+  "sepoliaRpcUrl": "https://ethereum-sepolia-rpc.publicnode.com",
+  "sepoliaChainId": 11155111,
+  "observerAddress": ""
+}
