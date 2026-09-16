@@ -4,7 +4,7 @@
 |---|---|
 | Compiler | 0.8.36 |
 | EVM version | cancun |
-| Optimizer | disabled |
+| Optimizer | enabled, 200 runs |
 
 ## How to load
 
