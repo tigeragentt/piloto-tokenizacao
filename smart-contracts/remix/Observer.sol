@@ -9,20 +9,6 @@ pragma solidity 0.8.36;
 
 import "https://raw.githubusercontent.com/OpenZeppelin/openzeppelin-contracts/v5.2.0/contracts/access/AccessControl.sol";
 
-/**
- * @title Observer
- * @notice Immutable supervisability layer for the ABToken / CVM pilot.
- *         Deployed on Ethereum Sepolia. Chainlink CRE workflows anchor:
- *           - FIDC settlement proofs from the Capitare Observer API
- *           - XDC token actions (Transfer, EscrowCreated, LockResolved, …)
- *
- *         CVM auditors can independently verify:
- *           - deliveryProofSHA256: sha256 of capitare:debentures:delivery-proof:v1 manifest
- *           - resolutionHash: keccak256 of settlement resolution struct; must match
- *             the LockResolved event emitted by the escrow contract on XDC (chain 51)
- *
- * @custom:security-contact sol@abtoken.xyz
- */
 contract Observer is AccessControl {
 
     string public constant VERSION = "1.0.0";
