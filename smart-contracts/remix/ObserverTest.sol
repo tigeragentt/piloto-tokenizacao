@@ -286,4 +286,19 @@ contract ObserverTest is AccessControl {
         require(idx != 0, "Observer: fund not found");
         return _funds[idx - 1];
     }
+
+    function getLatestFunds(uint256 count) external view returns (FundInfo[] memory result) {
+        uint256 total = _funds.length;
+        uint256 n = count > total ? total : count;
+        result = new FundInfo[](n);
+        for (uint256 i = 0; i < n; i++) result[i] = _funds[total - n + i];
+    }
+
+    function getFunds(uint256 fromIndex, uint256 toIndex) external view returns (FundInfo[] memory result) {
+        require(fromIndex <= toIndex, "Observer: invalid range");
+        require(toIndex < _funds.length, "Observer: out of bounds");
+        uint256 n = toIndex - fromIndex + 1;
+        result = new FundInfo[](n);
+        for (uint256 i = 0; i < n; i++) result[i] = _funds[fromIndex + i];
+    }
 }
