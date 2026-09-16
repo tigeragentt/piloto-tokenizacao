@@ -15,7 +15,7 @@
 
 ## Notes
 
-- The import uses a raw GitHub URL — Remix fetches OpenZeppelin v5.2.0 automatically, no npm needed
+- The import uses `@openzeppelin/contracts` — Remix resolves it automatically, no npm needed
 - EVM version **cancun** is required to match the Hardhat config (important for Etherscan verification)
 - After deployment, grant `REPORTER_ROLE` to the CRE wallet:
   ```
