@@ -117,25 +117,25 @@ contract ObserverTest is AccessControl {
 
     event FundRegistered(
         uint256 indexed fundIdx,
-        string          fundId,
+        string  indexed fundId,
         string          name
     );
 
     event ActionReported(
         uint256    indexed recordId,
         string     indexed network,
+        string     indexed txHash,
         ActionType         action,
         string             from,
         string             to,
         uint256            amount,
-        string             txHash,
         uint256            timestamp
     );
 
     event SettlementReported(
         uint256 indexed recordId,
+        string  indexed orderId,
         bytes32 indexed intentHash,
-        string          orderId,
         string          progress,
         bool            technicalCompleted,
         bool            accountingCompleted,
@@ -188,7 +188,7 @@ contract ObserverTest is AccessControl {
             amount: amount, txHash: txHash,
             timestamp: block.timestamp, blockNumber: block.number
         }));
-        emit ActionReported(recordId, network, action, from, to, amount, txHash, block.timestamp);
+        emit ActionReported(recordId, network, txHash, action, from, to, amount, block.timestamp);
     }
 
     function reportSettlement(
@@ -212,7 +212,7 @@ contract ObserverTest is AccessControl {
         }));
         latestSettlementId[s.intentHash] = recordId + 1;
         emit SettlementReported(
-            recordId, s.intentHash, s.orderId, s.progress,
+            recordId, s.orderId, s.intentHash, s.progress,
             s.technicalCompleted, s.accountingCompleted,
             s.deliveryProofSHA256, s.resolutionHash, block.timestamp
         );
