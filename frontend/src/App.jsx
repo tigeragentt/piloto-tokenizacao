@@ -6,6 +6,7 @@ import OrdersPage from './pages/OrdersPage.jsx'
 import ObserverPage from './pages/ObserverPage.jsx'
 import XDCPage from './pages/XDCPage.jsx'
 import CREPage from './pages/CREPage.jsx'
+import CapitarePage from './pages/CapitarePage.jsx'
 
 export default function App() {
   return (
@@ -33,6 +34,9 @@ export default function App() {
             <NavLink to="/cre" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
               CRE
             </NavLink>
+            <NavLink to="/capitare" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+              Capitare
+            </NavLink>
           </nav>
           <WalletButton />
         </header>
@@ -43,6 +47,7 @@ export default function App() {
             <Route path="/observer" element={<ObserverPage />} />
             <Route path="/xdc" element={<XDCPage />} />
             <Route path="/cre" element={<CREPage />} />
+            <Route path="/capitare" element={<CapitarePage />} />
           </Routes>
         </main>
         <footer className="app-footer">

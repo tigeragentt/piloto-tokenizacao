@@ -42,6 +42,154 @@ project.yaml             CRE project config (Sepolia chain selector + RPC)
 secrets.yaml             CRE secret name → env var mapping (no actual values)
 ```
 
+## Known staging test values
+
+| Key | Value | Where it lives |
+|---|---|---|
+| `OBSERVER_ID` | `mb-observer-demo` | `capitareClientId` in `config.staging.json` |
+| `BASE` | `https://dev-api-mercado-bitcoin.web3up.mobi/v1/external/observer` | `capitareBaseUrl` in `config.staging.json` |
+| `FUND` | `be6f2e8a-5474-43c7-a692-7918c37e3f42` | `fundId` in `config.staging.json` |
+| `ORDER` (test order) | `8fdac770-7ca3-4a1f-a283-33efa75c96ef` | `testOrderId` in `config.staging.json` |
+| `OBSERVER_KEY` | _(secret)_ | `CAPITARE_OBSERVER_KEY` in `.env` |
+
+### How to use in tests
+
+**Option A — curl the staging API directly**
+
+Make sure `CAPITARE_OBSERVER_KEY` is exported in your shell first:
+
+```bash
+export OBSERVER_ID='mb-observer-demo'
+export OBSERVER_KEY='<value from .env>'
+export BASE='https://dev-api-mercado-bitcoin.web3up.mobi/v1/external/observer'
+export FUND='be6f2e8a-5474-43c7-a692-7918c37e3f42'
+export ORDER='8fdac770-7ca3-4a1f-a283-33efa75c96ef'
+```
+
+List all orders for the fund:
+```bash
+curl -s \
+  -H "X-Observer-Id: $OBSERVER_ID" \
+  -H "X-Observer-Key: $OBSERVER_KEY" \
+  "$BASE/funds/$FUND/debenture-orders" | jq .
+```
+
+Get settlement for the test order:
+```bash
+curl -s \
+  -H "X-Observer-Id: $OBSERVER_ID" \
+  -H "X-Observer-Key: $OBSERVER_KEY" \
+  "$BASE/funds/$FUND/debenture-orders/$ORDER/settlement" | jq .
+```
+
+Get proof for the test order:
+```bash
+curl -s \
+  -H "X-Observer-Id: $OBSERVER_ID" \
+  -H "X-Observer-Key: $OBSERVER_KEY" \
+  "$BASE/funds/$FUND/debenture-orders/$ORDER/proof" | jq .
+```
+
+**Option B — run CRE simulate against the real staging API**
+
+All four non-secret values are already in `config.staging.json`. Only `CAPITARE_OBSERVER_KEY` needs to be in `.env`:
+
+```bash
+# CRON trigger — scans all orders and anchors settled ones
+cre workflow simulate workflow-capitare --target staging-settings --non-interactive --trigger-index 0
+
+# HTTP trigger — same logic, manual fire
+cre workflow simulate workflow-capitare --target staging-settings --non-interactive --trigger-index 1 --http-payload ./workflow-capitare/payload.json
+```
+
+**Option C — run against the mock (no real API or keys needed)**
+
+```bash
+node test/mock-server.js &
+cre workflow simulate workflow-capitare --target test-settings --non-interactive --trigger-index 0
+```
+
+---
+
+## Testing with ObserverTest.sol
+
+`ObserverTest.sol` is the Remix-ready version of Observer for development testing.
+
+| | Observer.sol | ObserverTest.sol |
+|---|---|---|
+| Deploy via | Hardhat | Remix IDE |
+| REPORTER_ROLE | Must be granted manually after deploy | Auto-granted to `msg.sender` in constructor |
+| Deployed on Sepolia | see config | `0x84E0439Da40a543E45847841393d71A45A715537` |
+| Purpose | Production / CRE workflow | Manual testing in Remix |
+
+### Test sequence in Remix
+
+Connect MetaMask to Sepolia, load `smart-contracts/remix/ObserverTest.sol`, and run in order:
+
+**1. registerFund**
+
+Paste into the `f` parameter:
+```
+["be6f2e8a-5474-43c7-a692-7918c37e3f42","Horizonte Crédito Multirrede FIDC — Piloto XDC","eip155:51","0x0000000000000000000000000000000000000001","0x0000000000000000000000000000000000000002","0x0000000000000000000000000000000000000003","xrpl:testnet","rTestIssuerXXXXXXXXXXXXXXXXXXXXXXXXXX","CVD"]
+```
+Verify: `isFundRegistered("be6f2e8a-5474-43c7-a692-7918c37e3f42")` → `true`
+
+**2. reportSettlement** — order 0001 (ready to anchor)
+```
+["test-order-0001-ready-to-anchor","0xaabb000000000000000000000000000000000000000000000000000000000001","ACQUIRED_WITH_LOCK",true,true,"0xdeadbeef00000000000000000000000000000000000000000000000000000001","0xcc110000000000000000000000000000000000000000000000000000000001aa","eip155:51","xrpl:testnet"]
+```
+Verify:
+- `isOrderAnchored("test-order-0001-ready-to-anchor")` → `true`
+- `isSettlementAnchored("0xaabb000000000000000000000000000000000000000000000000000000000001")` → `true`
+- Call again with same orderId → should revert with `OrderAlreadyAnchored`
+
+**3. reportSettlement** — order 0003 (already anchored case)
+```
+["test-order-0003-already-anchored","0xaabb000000000000000000000000000000000000000000000000000000000003","ACQUIRED_WITH_LOCK",true,true,"0xdeadbeef00000000000000000000000000000000000000000000000000000003","0xcc110000000000000000000000000000000000000000000000000000000003aa","eip155:51","xrpl:testnet"]
+```
+
+**4. reportSettlement** — order 0004 (technical done, accounting pending)
+```
+["test-order-0004-tech-only","0xaabb000000000000000000000000000000000000000000000000000000000004","ACQUIRED_WITH_LOCK",true,false,"0xdeadbeef00000000000000000000000000000000000000000000000000000004","0xcc110000000000000000000000000000000000000000000000000000000004aa","eip155:51","xrpl:testnet"]
+```
+
+**5. View calls to verify state**
+
+| Function | Input | Expected result |
+|---|---|---|
+| `isOrderAnchored` | `"test-order-0001-ready-to-anchor"` | `true` |
+| `isOrderAnchored` | `"test-order-0002-not-settled"` | `false` |
+| `getSettlementCount` | — | count of anchored settlements |
+| `getLatestSettlement` | `0xaabb...0001` | full SettlementRecord |
+| `getSettlement` | `0` | first record |
+| `getFundCount` | — | `1` |
+| `getFundById` | `"be6f2e8a-5474-43c7-a692-7918c37e3f42"` | full FundInfo |
+
+> All fake input values match `test/fixtures.json` — run `node test/mock-server.js` to serve these same values as Capitare API for CRE workflow testing.
+
+---
+
+## Local testing (no real API needed)
+
+Start the Capitare mock server (zero dependencies, Node built-in only):
+
+```bash
+node test/mock-server.js
+# Capitare mock server running on http://localhost:3001
+```
+
+Run the CRE workflow against the mock:
+
+```bash
+cre workflow simulate workflow-capitare --target test-settings --non-interactive --trigger-index 0
+```
+
+For the frontend, set `CAPITARE_BASE_URL=http://localhost:3001` in `.env.local` so Vite proxies to the mock instead of the real API.
+
+For Remix contract testing, see `test/remix-inputs.md` — copy-paste values for `registerFund`, `reportSettlement`, and all view calls.
+
+---
+
 ## Setup
 
 ### Smart contracts
@@ -85,6 +233,19 @@ Set CRE secrets (stored in the DON, not locally):
 CAPITARE_OBSERVER_KEY=<from observer-api.env>
 CRE_TRANSACTION_PRIVATE_KEY=<CRE wallet private key>
 ```
+
+Simulate — CRON trigger (no payload needed):
+```bash
+cre workflow simulate workflow-capitare --target staging-settings --non-interactive --trigger-index 0
+```
+
+Simulate — HTTP trigger (uses `payload.json`):
+```bash
+cre workflow simulate workflow-capitare --target staging-settings --non-interactive --trigger-index 1 --http-payload ./workflow-capitare/payload.json
+```
+
+> Simulation calls the **real Capitare API** and the **real Sepolia RPC** — no mocks.
+> Set `CAPITARE_OBSERVER_KEY` in `.env` and `observerAddress` in `config.staging.json` before running.
 
 Deploy (staging):
 ```bash

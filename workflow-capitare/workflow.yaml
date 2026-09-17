@@ -2,6 +2,16 @@
 # CRE WORKFLOW SETTINGS FILE
 # ==========================================================================
 
+test-settings:
+  user-workflow:
+    workflow-name: "workflow-capitare-test"
+    deployment-registry: "private"
+  workflow-artifacts:
+    workflow-path: "./main.ts"
+    config-path: "./config/config.test.json"
+    secrets-path: "../secrets.yaml"
+
+# ==========================================================================
 staging-settings:
   user-workflow:
     workflow-name: "workflow-capitare-staging"

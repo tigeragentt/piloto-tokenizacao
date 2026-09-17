@@ -1,8 +1,7 @@
 {
-  "capitareBaseUrl": "https://dev-api-mercado-bitcoin.web3up.mobi/v1/external/observer",
-  "capitareClientId": "mb-observer-demo",
+  "capitareBaseUrl": "http://localhost:3001/v1/external/observer",
+  "capitareClientId": "mock-client",
   "fundId": "be6f2e8a-5474-43c7-a692-7918c37e3f42",
-  "testOrderId": "8fdac770-7ca3-4a1f-a283-33efa75c96ef",
   "schedule": "0 */2 * * * *",
   "sepoliaRpcUrl": "https://ethereum-sepolia-rpc.publicnode.com",
   "sepoliaChainId": 11155111,

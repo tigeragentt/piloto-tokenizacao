@@ -1,0 +1,98 @@
+{
+  "_comment": "Fake Capitare API responses for local testing. Used by mock-server.js.",
+  "_fund_id": "be6f2e8a-5474-43c7-a692-7918c37e3f42",
+
+  "orders": {
+    "items": [
+      {
+        "id": "test-order-0001-ready-to-anchor",
+        "intentHash": "aabb000000000000000000000000000000000000000000000000000000000001",
+        "progress": "ACQUIRED_WITH_LOCK",
+        "settlementCompleted": true,
+        "accountingCompleted": true,
+        "intent": {
+          "sourceNetwork": "eip155:51",
+          "destinationNetwork": "xrpl:testnet"
+        }
+      },
+      {
+        "id": "test-order-0002-not-settled",
+        "intentHash": "aabb000000000000000000000000000000000000000000000000000000000002",
+        "progress": "PAYMENT_INITIATED",
+        "settlementCompleted": false,
+        "accountingCompleted": false,
+        "intent": {
+          "sourceNetwork": "eip155:51",
+          "destinationNetwork": "xrpl:testnet"
+        }
+      },
+      {
+        "id": "test-order-0003-already-anchored",
+        "intentHash": "aabb000000000000000000000000000000000000000000000000000000000003",
+        "progress": "ACQUIRED_WITH_LOCK",
+        "settlementCompleted": true,
+        "accountingCompleted": true,
+        "intent": {
+          "sourceNetwork": "eip155:51",
+          "destinationNetwork": "xrpl:testnet"
+        }
+      },
+      {
+        "id": "test-order-0004-tech-only",
+        "intentHash": "aabb000000000000000000000000000000000000000000000000000000000004",
+        "progress": "ACQUIRED_WITH_LOCK",
+        "settlementCompleted": true,
+        "accountingCompleted": false,
+        "intent": {
+          "sourceNetwork": "eip155:51",
+          "destinationNetwork": "xrpl:testnet"
+        }
+      }
+    ]
+  },
+
+  "settlements": {
+    "test-order-0001-ready-to-anchor": {
+      "resolutionHash": "0xcc110000000000000000000000000000000000000000000000000000000001aa",
+      "technicalSettlementCompleted": true,
+      "accountingCompleted": true,
+      "resolution": {
+        "deliveryProofSHA256": "deadbeef00000000000000000000000000000000000000000000000000000001"
+      }
+    },
+    "test-order-0003-already-anchored": {
+      "resolutionHash": "0xcc110000000000000000000000000000000000000000000000000000000003aa",
+      "technicalSettlementCompleted": true,
+      "accountingCompleted": true,
+      "resolution": {
+        "deliveryProofSHA256": "deadbeef00000000000000000000000000000000000000000000000000000003"
+      }
+    },
+    "test-order-0004-tech-only": {
+      "resolutionHash": "0xcc110000000000000000000000000000000000000000000000000000000004aa",
+      "technicalSettlementCompleted": true,
+      "accountingCompleted": false,
+      "resolution": {
+        "deliveryProofSHA256": "deadbeef00000000000000000000000000000000000000000000000000000004"
+      }
+    }
+  },
+
+  "proofs": {
+    "test-order-0001-ready-to-anchor": {
+      "sha256": "deadbeef00000000000000000000000000000000000000000000000000000001",
+      "manifest": "capitare:debentures:delivery-proof:v1",
+      "orderId": "test-order-0001-ready-to-anchor"
+    },
+    "test-order-0003-already-anchored": {
+      "sha256": "deadbeef00000000000000000000000000000000000000000000000000000003",
+      "manifest": "capitare:debentures:delivery-proof:v1",
+      "orderId": "test-order-0003-already-anchored"
+    },
+    "test-order-0004-tech-only": {
+      "sha256": "deadbeef00000000000000000000000000000000000000000000000000000004",
+      "manifest": "capitare:debentures:delivery-proof:v1",
+      "orderId": "test-order-0004-tech-only"
+    }
+  }
+}

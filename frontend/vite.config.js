@@ -7,6 +7,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    define: {
+      'import.meta.env.OBSERVER_ADDRESS': JSON.stringify(env.OBSERVER_ADDRESS || ''),
+    },
     server: {
       port: 5175,
       strictPort: false,

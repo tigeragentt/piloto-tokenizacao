@@ -24,7 +24,7 @@ export const XDC_NETWORK_PARAMS = {
 // ─── Observer.sol (Sepolia) ────────────────────────────────────────────────────
 
 // Set once deployed; empty string disables Observer reads/writes
-export const OBSERVER_ADDRESS = import.meta.env.VITE_OBSERVER_ADDRESS || ''
+export const OBSERVER_ADDRESS = import.meta.env.OBSERVER_ADDRESS || ''
 
 export const REPORTER_ROLE = '0x' + 'reporter_role'.padEnd(0, '0')
 // Actual computed value — keccak256("REPORTER_ROLE")

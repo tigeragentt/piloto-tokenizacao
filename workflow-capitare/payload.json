@@ -1,0 +1,4 @@
+{
+  "trigger": "manual-simulate",
+  "description": "Scan Capitare debenture-orders and anchor settled ones on Observer.sol"
+}
