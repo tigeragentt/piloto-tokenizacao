@@ -104,6 +104,9 @@ type ScanResult = {
   errors: string[]
 }
 
+// Envelope returned by capitareGet — never null (CRE consensus can't wrap null)
+type CapitareResult = { found: false } | { found: true; body: object }
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const toBytes32 = (hex: string): `0x${string}` => {
@@ -152,12 +155,12 @@ const capitareGet = (
   httpClient: HTTPClient,
   path: string,
   observerKey: string,
-): object | null => {
+): CapitareResult => {
   const { capitareBaseUrl, capitareClientId } = runtime.config
   const url = `${capitareBaseUrl}${path}`
   return httpClient.sendRequest(
     runtime,
-    (sendRequester: HTTPSendRequester): object | null => {
+    (sendRequester: HTTPSendRequester): CapitareResult => {
       const r = sendRequester.sendRequest({
         url,
         method: "GET",
@@ -168,11 +171,11 @@ const capitareGet = (
         },
         body: bytesToBase64(new Uint8Array(0)),
       }).result()
-      if (r.statusCode === 404) return null
+      if (r.statusCode === 404) return { found: false }
       if (!ok(r)) throw new Error(`Capitare GET ${path} → HTTP ${r.statusCode}`)
-      return json(r) as object
+      return { found: true, body: json(r) as object }
     },
-    consensusIdenticalAggregation<object | null>()
+    consensusIdenticalAggregation<CapitareResult>()
   )().result()
 }
 
@@ -296,12 +299,12 @@ const scanAndAnchor = async (runtime: Runtime<Config>): Promise<ScanResult> => {
 
   runtime.log(`Fetching orders for fund ${fundId}`)
   const ordersData = capitareGet(runtime, httpClient, `/funds/${fundId}/debenture-orders`, observerKey)
-  if (!ordersData) {
+  if (!ordersData.found) {
     runtime.log("No orders data (404) — fund not found or no orders yet")
     return result
   }
 
-  const { items: orders } = ordersData as OrdersResponse
+  const { items: orders } = ordersData.body as OrdersResponse
   result.ordersChecked = orders.length
   runtime.log(`Found ${orders.length} order(s)`)
   for (const o of orders) {
@@ -330,13 +333,13 @@ const scanAndAnchor = async (runtime: Runtime<Config>): Promise<ScanResult> => {
         `/funds/${fundId}/debenture-orders/${order.id}/settlement`,
         observerKey,
       )
-      if (!settlementData) {
+      if (!settlementData.found) {
         runtime.log(`Order ${order.id}: settlement endpoint returned 404 — skip`)
         result.skipped++
         continue
       }
 
-      const settlement = settlementData as SettlementResponse
+      const settlement = settlementData.body as SettlementResponse
       if (!settlement.technicalSettlementCompleted) {
         runtime.log(`Order ${order.id}: technicalSettlementCompleted=false — skip`)
         result.skipped++
