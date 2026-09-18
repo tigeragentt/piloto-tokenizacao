@@ -134,7 +134,7 @@ export default function CapitarePage() {
       )}
       {!OBSERVER_ADDRESS && (
         <div className="alert alert-info">
-          Observer.sol not deployed yet. Observer status column will show — until <code>VITE_OBSERVER_ADDRESS</code> is set.
+          Observer address not set. Add <code>OBSERVER_ADDRESS=0x...</code> to <code>frontend/.env</code> to enable the Observer status column.
         </div>
       )}
       {error && <div className="alert alert-warn">{error}</div>}

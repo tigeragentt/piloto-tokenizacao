@@ -192,9 +192,9 @@ export default function Dashboard() {
 
       {!OBSERVER_ADDRESS && (
         <div className="alert alert-info" style={{ marginTop: 0 }}>
-          <strong>Observer.sol not yet deployed.</strong> After deploying to Sepolia, set{' '}
-          <code>VITE_OBSERVER_ADDRESS</code> and rebuild. Until then, the Observer page shows
-          admin tools to deploy and configure.
+          <strong>Observer address not configured.</strong> Set{' '}
+          <code>OBSERVER_ADDRESS=0x...</code> in <code>frontend/.env</code> and restart.
+          ObserverTest is already deployed at <code>0x84E0439Da40a543E45847841393d71A45A715537</code>.
         </div>
       )}
     </div>

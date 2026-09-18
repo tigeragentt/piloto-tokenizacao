@@ -17,12 +17,17 @@ const readProvider = OBSERVER_ADDRESS ? new ethers.JsonRpcProvider(SEPOLIA_RPC) 
 function ObserverNotDeployed() {
   return (
     <div className="card">
-      <div className="card-title">Observer.sol — Not Yet Deployed</div>
+      <div className="card-title">Observer.sol — Address Not Configured</div>
       <div className="alert alert-warn" style={{ marginBottom: 12 }}>
-        Observer.sol has not been deployed to Sepolia yet.
-        Once deployed, set <code>VITE_OBSERVER_ADDRESS</code> and rebuild the frontend.
+        <code>OBSERVER_ADDRESS</code> is not set in <code>frontend/.env</code>.
+        Set it to the deployed Observer (or ObserverTest) address on Sepolia and restart the frontend.
       </div>
-      <div className="section-label">Next Steps</div>
+      <div className="section-label">Quick Start (ObserverTest already deployed)</div>
+      <ol style={{ fontSize: 13, color: 'var(--text-dim)', paddingLeft: 20, lineHeight: 2.2 }}>
+        <li>Add to <code>frontend/.env</code>: <code>OBSERVER_ADDRESS=0x84E0439Da40a543E45847841393d71A45A715537</code></li>
+        <li>Restart the frontend</li>
+      </ol>
+      <div className="section-label" style={{ marginTop: 12 }}>Deploy Production Observer.sol</div>
       <ol style={{ fontSize: 13, color: 'var(--text-dim)', paddingLeft: 20, lineHeight: 2.2 }}>
         <li>Install: <code>cd smart-contracts &amp;&amp; npm install</code></li>
         <li>Compile: <code>npx hardhat compile</code></li>
@@ -30,7 +35,7 @@ function ObserverNotDeployed() {
         <li>Copy the deployed address</li>
         <li>Set <code>observerAddress</code> in <code>workflow-capitare/config/config.staging.json</code></li>
         <li>Grant <code>REPORTER_ROLE</code> to the CRE wallet on the deployed contract</li>
-        <li>Set <code>VITE_OBSERVER_ADDRESS=0x...</code> and rebuild this frontend</li>
+        <li>Set <code>OBSERVER_ADDRESS=0x...</code> in <code>frontend/.env</code> and restart</li>
       </ol>
     </div>
   )
