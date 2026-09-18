@@ -298,11 +298,17 @@ function RegisterFundPanel({ signer }) {
     setMsg(null)
     try {
       const contract = new ethers.Contract(OBSERVER_ADDRESS, OBSERVER_ABI, signer)
-      const tx = await contract.registerFund(
-        form.fundId, form.name, form.xdcNetwork,
-        form.xdcFidcManager, form.xdcStable, form.xdcEscrowFactory,
-        form.xrplNetwork, form.xrplIssuer, form.debentureCurrency,
-      )
+      const tx = await contract.registerFund({
+        fundId:            form.fundId,
+        name:              form.name,
+        xdcNetwork:        form.xdcNetwork,
+        xdcFidcManager:    form.xdcFidcManager,
+        xdcStable:         form.xdcStable,
+        xdcEscrowFactory:  form.xdcEscrowFactory,
+        xrplNetwork:       form.xrplNetwork,
+        xrplIssuer:        form.xrplIssuer,
+        debentureCurrency: form.debentureCurrency,
+      })
       setMsg(`Tx sent: ${tx.hash}`)
       setStatus('pending')
       const receipt = await tx.wait()
