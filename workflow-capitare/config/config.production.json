@@ -6,5 +6,5 @@
   "sepoliaRpcUrl": "https://ethereum-sepolia-rpc.publicnode.com",
   "sepoliaChainId": 11155111,
   "observerAddress": "",
-  "maxOrdersPerRun": 10
+  "maxOrdersPerRun": 5
 }
