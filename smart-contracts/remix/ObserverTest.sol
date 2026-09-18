@@ -1,27 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.36;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
+import {ReceiverTemplate} from "./ReceiverTemplate.sol";
 
 /**
  * @title ObserverTest
- * @notice Remix-only deploy target — mirrors Observer.sol v1.2.0 exactly but:
- *           1. Self-contained (IReceiver defined inline; no local imports needed)
- *           2. No-arg constructor that defaults to the Sepolia simulation forwarder
- *           3. Auto-grants REPORTER_ROLE to the deployer for easier manual testing
+ * @notice Remix-only deploy target — mirrors Observer.sol v1.3.0 exactly but:
+ *           1. No-arg constructor (defaults to Sepolia simulation forwarder)
+ *           2. reportSettlement() and reportAction() are public (no onlyOwner) for easier Remix testing
  *         Do NOT deploy this to production. Use contracts/Observer.sol instead.
+ *
+ * @dev Load BOTH ReceiverTemplate.sol and ObserverTest.sol into Remix before compiling.
  */
-
-// ─── IReceiver interface (inline copy — matches contracts/interfaces/IReceiver.sol) ──
-
-interface IReceiver is IERC165 {
-    function onReport(bytes calldata metadata, bytes calldata report) external;
-}
-
-// ─── ObserverTest ────────────────────────────────────────────────────────────
-
-contract ObserverTest is AccessControl, IReceiver {
+contract ObserverTest is ReceiverTemplate {
 
     // ─── Errors ─────────────────────────────────────────────────────────────
 
@@ -32,32 +23,14 @@ contract ObserverTest is AccessControl, IReceiver {
     error InvalidRange();
     error OutOfBounds();
 
-    error InvalidForwarderAddress();
-    error InvalidSender(address sender, address expected);
-    error InvalidAuthor(address received, address expected);
-    error InvalidWorkflowName(bytes10 received, bytes10 expected);
-    error InvalidWorkflowId(bytes32 received, bytes32 expected);
-    error WorkflowNameRequiresAuthorValidation();
-
     // ─── Constants ───────────────────────────────────────────────────────────
 
-    string public constant VERSION = "1.2.0";
+    string public constant VERSION = "1.3.0";
 
-    bytes32 public constant REPORTER_ROLE = keccak256("REPORTER_ROLE");
-
-    bytes private constant HEX_CHARS = "0123456789abcdef";
-
-    // Sepolia simulation forwarder — default for Remix deployments.
-    // Update via setForwarderAddress() to switch to:
-    //   Production : 0xF8344CFd5c43616a4366C34E3EEE75af79a74482
+    // Sepolia simulation forwarder — default for no-arg constructor.
+    // Call setForwarderAddress() to switch.
+    // Production: 0xF8344CFd5c43616a4366C34E3EEE75af79a74482
     address private constant SIMULATION_FORWARDER = 0x15fC6ae953E024d975e77382eEeC56A9101f9F88;
-
-    // ─── Receiver Security State ─────────────────────────────────────────────
-
-    address private s_forwarderAddress;
-    address private s_expectedAuthor;
-    bytes10 private s_expectedWorkflowName;
-    bytes32 private s_expectedWorkflowId;
 
     // ─── Fund Registry ───────────────────────────────────────────────────────
 
@@ -85,8 +58,8 @@ contract ObserverTest is AccessControl, IReceiver {
         string  debentureCurrency;
     }
 
-    FundInfo[]                     private _funds;
-    mapping(string => uint256)     private _fundIdToIndex;
+    FundInfo[]                 private _funds;
+    mapping(string => uint256) private _fundIdToIndex;
 
     // ─── General Action Log ──────────────────────────────────────────────────
 
@@ -108,7 +81,7 @@ contract ObserverTest is AccessControl, IReceiver {
         uint256    blockNumber;
     }
 
-    ActionRecord[] private _actions;
+    ActionRecord[]           private _actions;
     mapping(bytes32 => bool) private _txAnchored;
 
     // ─── Settlement Records ──────────────────────────────────────────────────
@@ -139,18 +112,12 @@ contract ObserverTest is AccessControl, IReceiver {
         uint256  blockNumber;
     }
 
-    SettlementRecord[] private _settlements;
-    mapping(string => bool)     private _orderAnchored;
+    SettlementRecord[]       private _settlements;
+    mapping(string => bool)  private _orderAnchored;
 
     mapping(bytes32 => uint256) public latestSettlementId;
 
     // ─── Events ──────────────────────────────────────────────────────────────
-
-    event ForwarderAddressUpdated(address indexed previousForwarder, address indexed newForwarder);
-    event ExpectedAuthorUpdated(address indexed previousAuthor, address indexed newAuthor);
-    event ExpectedWorkflowNameUpdated(bytes10 indexed previousName, bytes10 indexed newName);
-    event ExpectedWorkflowIdUpdated(bytes32 indexed previousId, bytes32 indexed newId);
-    event SecurityWarning(string message);
 
     event FundRegistered(uint256 indexed fundIdx, string indexed fundId, string name);
 
@@ -179,61 +146,11 @@ contract ObserverTest is AccessControl, IReceiver {
 
     // ─── Constructor ─────────────────────────────────────────────────────────
 
-    constructor() {
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        // Remix convenience: deployer can call reportSettlement() directly
-        _grantRole(REPORTER_ROLE, msg.sender);
-        // Default to simulation forwarder — call setForwarderAddress() to change
-        s_forwarderAddress = SIMULATION_FORWARDER;
-        emit ForwarderAddressUpdated(address(0), SIMULATION_FORWARDER);
-    }
-
-    // ─── Receiver Security — Getters ─────────────────────────────────────────
-
-    function getForwarderAddress() external view returns (address) { return s_forwarderAddress; }
-    function getExpectedAuthor() external view returns (address) { return s_expectedAuthor; }
-    function getExpectedWorkflowName() external view returns (bytes10) { return s_expectedWorkflowName; }
-    function getExpectedWorkflowId() external view returns (bytes32) { return s_expectedWorkflowId; }
-
-    // ─── Receiver Security — Setters ─────────────────────────────────────────
-
-    function setForwarderAddress(address _forwarder) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        address prev = s_forwarderAddress;
-        if (_forwarder == address(0)) emit SecurityWarning("Forwarder address set to zero - contract is now INSECURE");
-        s_forwarderAddress = _forwarder;
-        emit ForwarderAddressUpdated(prev, _forwarder);
-    }
-
-    function setExpectedAuthor(address _author) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        address prev = s_expectedAuthor;
-        s_expectedAuthor = _author;
-        emit ExpectedAuthorUpdated(prev, _author);
-    }
-
-    function setExpectedWorkflowName(string calldata _name) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        bytes10 prev = s_expectedWorkflowName;
-        if (bytes(_name).length == 0) {
-            s_expectedWorkflowName = bytes10(0);
-            emit ExpectedWorkflowNameUpdated(prev, bytes10(0));
-            return;
-        }
-        bytes32 hash = sha256(bytes(_name));
-        bytes memory hexStr = _bytesToHexString(abi.encodePacked(hash));
-        bytes memory first10 = new bytes(10);
-        for (uint256 i = 0; i < 10; i++) first10[i] = hexStr[i];
-        s_expectedWorkflowName = bytes10(first10);
-        emit ExpectedWorkflowNameUpdated(prev, s_expectedWorkflowName);
-    }
-
-    function setExpectedWorkflowId(bytes32 _id) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        bytes32 prev = s_expectedWorkflowId;
-        s_expectedWorkflowId = _id;
-        emit ExpectedWorkflowIdUpdated(prev, _id);
-    }
+    constructor() ReceiverTemplate(SIMULATION_FORWARDER) {}
 
     // ─── Admin ────────────────────────────────────────────────────────────────
 
-    function registerFund(FundInput calldata f) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function registerFund(FundInput calldata f) external onlyOwner {
         if (_fundIdToIndex[f.fundId] != 0) revert FundAlreadyRegistered();
         _funds.push(FundInfo({
             fundId: f.fundId, name: f.name,
@@ -246,38 +163,7 @@ contract ObserverTest is AccessControl, IReceiver {
         emit FundRegistered(_funds.length - 1, f.fundId, f.name);
     }
 
-    // ─── IReceiver Implementation ─────────────────────────────────────────────
-
-    /// @inheritdoc IReceiver
-    /// @dev To test in Remix: call setForwarderAddress(YOUR_ADDRESS) first, then call onReport.
-    function onReport(bytes calldata metadata, bytes calldata report) external override {
-        if (s_forwarderAddress != address(0) && msg.sender != s_forwarderAddress) {
-            revert InvalidSender(msg.sender, s_forwarderAddress);
-        }
-
-        if (s_expectedWorkflowId != bytes32(0) || s_expectedAuthor != address(0) || s_expectedWorkflowName != bytes10(0)) {
-            (bytes32 workflowId, bytes10 workflowName, address workflowOwner) = _decodeMetadata(metadata);
-
-            if (s_expectedWorkflowId != bytes32(0) && workflowId != s_expectedWorkflowId) {
-                revert InvalidWorkflowId(workflowId, s_expectedWorkflowId);
-            }
-            if (s_expectedAuthor != address(0) && workflowOwner != s_expectedAuthor) {
-                revert InvalidAuthor(workflowOwner, s_expectedAuthor);
-            }
-            if (s_expectedWorkflowName != bytes10(0)) {
-                if (s_expectedAuthor == address(0)) revert WorkflowNameRequiresAuthorValidation();
-                if (workflowName != s_expectedWorkflowName) revert InvalidWorkflowName(workflowName, s_expectedWorkflowName);
-            }
-        }
-
-        _processReport(report);
-    }
-
-    function reportSettlement(SettlementInput calldata s) external onlyRole(REPORTER_ROLE) returns (uint256 recordId) {
-        return _reportSettlement(s);
-    }
-
-    // ─── Reporter ─────────────────────────────────────────────────────────────
+    // ─── Write (public for Remix testing convenience) ─────────────────────────
 
     function reportAction(
         string     calldata network,
@@ -286,7 +172,7 @@ contract ObserverTest is AccessControl, IReceiver {
         string     calldata to,
         uint256             amount,
         string     calldata txHash
-    ) external onlyRole(REPORTER_ROLE) returns (uint256 recordId) {
+    ) external returns (uint256 recordId) {
         bytes32 txKey = keccak256(abi.encodePacked(network, txHash));
         if (_txAnchored[txKey]) revert ActionAlreadyAnchored();
         _txAnchored[txKey] = true;
@@ -300,9 +186,13 @@ contract ObserverTest is AccessControl, IReceiver {
         emit ActionReported(recordId, network, txHash, action, from, to, amount, block.timestamp);
     }
 
-    // ─── Internal ─────────────────────────────────────────────────────────────
+    function reportSettlement(SettlementInput calldata s) external returns (uint256 recordId) {
+        return _reportSettlement(s);
+    }
 
-    function _processReport(bytes calldata report) internal {
+    // ─── ReceiverTemplate — CRE write path ───────────────────────────────────
+
+    function _processReport(bytes calldata report) internal override {
         SettlementInput memory s = abi.decode(report, (SettlementInput));
         _reportSettlement(s);
     }
@@ -330,32 +220,6 @@ contract ObserverTest is AccessControl, IReceiver {
             s.technicalCompleted, s.accountingCompleted,
             s.deliveryProofSHA256, s.resolutionHash, block.timestamp
         );
-    }
-
-    function _decodeMetadata(bytes memory metadata)
-        internal pure
-        returns (bytes32 workflowId, bytes10 workflowName, address workflowOwner)
-    {
-        assembly {
-            workflowId    := mload(add(metadata, 32))
-            workflowName  := mload(add(metadata, 64))
-            workflowOwner := shr(mul(12, 8), mload(add(metadata, 74)))
-        }
-    }
-
-    function _bytesToHexString(bytes memory data) private pure returns (bytes memory) {
-        bytes memory hexStr = new bytes(data.length * 2);
-        for (uint256 i = 0; i < data.length; i++) {
-            hexStr[i * 2]     = HEX_CHARS[uint8(data[i] >> 4)];
-            hexStr[i * 2 + 1] = HEX_CHARS[uint8(data[i] & 0x0f)];
-        }
-        return hexStr;
-    }
-
-    // ─── ERC165 ───────────────────────────────────────────────────────────────
-
-    function supportsInterface(bytes4 interfaceId) public view virtual override(AccessControl, IERC165) returns (bool) {
-        return interfaceId == type(IReceiver).interfaceId || super.supportsInterface(interfaceId);
     }
 
     // ─── Existence Checks ─────────────────────────────────────────────────────
