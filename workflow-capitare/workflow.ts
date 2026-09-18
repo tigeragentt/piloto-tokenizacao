@@ -241,7 +241,8 @@ const anchorSettlement = async (
   settlement: SettlementResponse,
 ): Promise<void> => {
   const { sepoliaRpcUrl, sepoliaChainId, observerAddress } = runtime.config
-  const privateKey = runtime.getSecret({ id: "cre_transaction_private_key" }).result().value as `0x${string}`
+  const rawKey = runtime.getSecret({ id: "cre_transaction_private_key" }).result().value as string
+  const privateKey = (rawKey.startsWith("0x") ? rawKey : `0x${rawKey}`) as `0x${string}`
   const account = privateKeyToAccount(privateKey)
 
   const intentHashBytes32 = toBytes32(order.intentHash)
