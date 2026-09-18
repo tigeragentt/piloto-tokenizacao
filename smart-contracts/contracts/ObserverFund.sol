@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.36;
 
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+
 /**
  * @title ObserverFund
- * @notice Abstract base that manages the FIDC fund registry.
- *         Provides the data model, internal write, and all public read functions.
- *         Access control (onlyOwner etc.) is enforced by the inheriting contract.
+ * @notice Standalone FIDC fund registry for the ABToken / CVM pilot.
+ *         Deployed independently; its address is passed to Observer on deployment.
+ *
+ * @custom:security-contact sol@abtoken.xyz
  */
-abstract contract ObserverFund {
+contract ObserverFund is Ownable {
 
     // ─── Errors ─────────────────────────────────────────────────────────────
 
@@ -55,10 +58,13 @@ abstract contract ObserverFund {
         string          name
     );
 
-    // ─── Internal Write ───────────────────────────────────────────────────────
+    // ─── Constructor ─────────────────────────────────────────────────────────
 
-    /// @dev Call this from the inheriting contract with the required access control.
-    function _registerFund(FundInput calldata f) internal {
+    constructor(address _owner) Ownable(_owner) {}
+
+    // ─── Write (onlyOwner) ────────────────────────────────────────────────────
+
+    function registerFund(FundInput calldata f) external onlyOwner {
         if (_fundIdToIndex[f.fundId] != 0) revert FundAlreadyRegistered();
         _funds.push(FundInfo({
             fundId: f.fundId, name: f.name,
@@ -71,7 +77,7 @@ abstract contract ObserverFund {
         emit FundRegistered(_funds.length - 1, f.fundId, f.name);
     }
 
-    // ─── Public Views ─────────────────────────────────────────────────────────
+    // ─── Views ────────────────────────────────────────────────────────────────
 
     function isFundRegistered(string calldata fundId) external view returns (bool) {
         return _fundIdToIndex[fundId] != 0;

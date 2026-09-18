@@ -6,29 +6,38 @@ import {ObserverFund} from "./ObserverFund.sol";
 
 /**
  * @title ObserverTest
- * @notice Remix-only deploy target — mirrors Observer.sol v1.4.0 exactly but:
- *           1. No-arg constructor (defaults to Sepolia simulation forwarder)
- *           2. reportSettlement() and reportAction() are public (no onlyOwner) for easier Remix testing
+ * @notice Remix-only deploy target — mirrors Observer.sol v1.5.0 exactly but:
+ *           1. No-arg constructor: defaults to Sepolia simulation forwarder
+ *              and deploys an ObserverFund internally for convenience
+ *           2. reportSettlement() and reportAction() are public (no onlyOwner)
  *         Do NOT deploy this to production. Use contracts/Observer.sol instead.
  *
- * @dev Load ReceiverTemplate.sol, ObserverFund.sol, and ObserverTest.sol into Remix before compiling.
+ * @dev Load ReceiverTemplate.sol, ObserverFund.sol, and ObserverTest.sol into Remix.
+ *      After deploying ObserverTest, call fund() to get the ObserverFund address,
+ *      then interact with it directly for fund operations (registerFund, etc.).
  */
-contract ObserverTest is ReceiverTemplate, ObserverFund {
+contract ObserverTest is ReceiverTemplate {
 
     // ─── Errors ─────────────────────────────────────────────────────────────
-    // NotFound / InvalidRange / OutOfBounds / FundAlreadyRegistered come from ObserverFund
 
     error ActionAlreadyAnchored();
     error OrderAlreadyAnchored();
+    error NotFound();
+    error InvalidRange();
+    error OutOfBounds();
 
     // ─── Constants ───────────────────────────────────────────────────────────
 
-    string public constant VERSION = "1.4.0";
+    string public constant VERSION = "1.5.0";
 
     // Sepolia simulation forwarder — default for no-arg constructor.
     // Call setForwarderAddress() to switch.
     // Production: 0xF8344CFd5c43616a4366C34E3EEE75af79a74482
     address private constant SIMULATION_FORWARDER = 0x15fC6ae953E024d975e77382eEeC56A9101f9F88;
+
+    // ─── Fund reference ───────────────────────────────────────────────────────
+
+    ObserverFund public fund;
 
     // ─── General Action Log ──────────────────────────────────────────────────
 
@@ -113,12 +122,10 @@ contract ObserverTest is ReceiverTemplate, ObserverFund {
 
     // ─── Constructor ─────────────────────────────────────────────────────────
 
-    constructor() ReceiverTemplate(SIMULATION_FORWARDER) {}
-
-    // ─── Admin ────────────────────────────────────────────────────────────────
-
-    function registerFund(FundInput calldata f) external onlyOwner {
-        _registerFund(f);
+    // Deploys its own ObserverFund for Remix convenience.
+    // Call fund() to get the ObserverFund address, then use it directly.
+    constructor() ReceiverTemplate(SIMULATION_FORWARDER) {
+        fund = new ObserverFund(msg.sender);
     }
 
     // ─── Write (public for Remix testing convenience) ─────────────────────────

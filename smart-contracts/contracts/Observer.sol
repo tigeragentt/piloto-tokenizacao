@@ -16,24 +16,32 @@ import {ObserverFund} from "./ObserverFund.sol";
  *           - resolutionHash: keccak256 of settlement resolution struct; must match
  *             the LockResolved event emitted by the escrow contract on XDC (chain 51)
  *
- *         Inheritance: Observer → ReceiverTemplate (CRE receiver)
- *                                → ObserverFund    (FIDC fund registry)
+ *         Deployment order:
+ *           1. Deploy ObserverFund (pass deployer address as _owner)
+ *           2. Deploy Observer (pass forwarder address + ObserverFund address)
+ *
  *         CRE write path: KeystoneForwarder → onReport() [ReceiverTemplate] → _processReport()
  *         Direct write path: owner calls reportSettlement() / reportAction()
  *
  * @custom:security-contact sol@abtoken.xyz
  */
-contract Observer is ReceiverTemplate, ObserverFund {
+contract Observer is ReceiverTemplate {
 
     // ─── Errors ─────────────────────────────────────────────────────────────
-    // NotFound / InvalidRange / OutOfBounds / FundAlreadyRegistered come from ObserverFund
 
     error ActionAlreadyAnchored();
     error OrderAlreadyAnchored();
+    error NotFound();
+    error InvalidRange();
+    error OutOfBounds();
 
     // ─── Constants ───────────────────────────────────────────────────────────
 
-    string public constant VERSION = "1.4.0";
+    string public constant VERSION = "1.5.0";
+
+    // ─── Fund reference ───────────────────────────────────────────────────────
+
+    ObserverFund public fund;
 
     // ─── General Action Log ──────────────────────────────────────────────────
 
@@ -130,15 +138,12 @@ contract Observer is ReceiverTemplate, ObserverFund {
 
     // ─── Constructor ─────────────────────────────────────────────────────────
 
-    /// @param _forwarderAddress CRE KeystoneForwarder address (passed to ReceiverTemplate).
+    /// @param _forwarderAddress CRE KeystoneForwarder address.
     ///        Simulation Sepolia: 0x15fC6ae953E024d975e77382eEeC56A9101f9F88
     ///        Production Sepolia: 0xF8344CFd5c43616a4366C34E3EEE75af79a74482
-    constructor(address _forwarderAddress) ReceiverTemplate(_forwarderAddress) {}
-
-    // ─── Admin (onlyOwner) ────────────────────────────────────────────────────
-
-    function registerFund(FundInput calldata f) external onlyOwner {
-        _registerFund(f);
+    /// @param _fund Address of the deployed ObserverFund contract.
+    constructor(address _forwarderAddress, address _fund) ReceiverTemplate(_forwarderAddress) {
+        fund = ObserverFund(_fund);
     }
 
     // ─── Direct write path (onlyOwner — bypass CRE for admin / recovery) ─────

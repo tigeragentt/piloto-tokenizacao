@@ -2,15 +2,16 @@
 pragma solidity 0.8.36;
 
 // Remix copy — mirrors contracts/ObserverFund.sol exactly.
-// Load ReceiverTemplate.sol, ObserverFund.sol, and ObserverTest.sol into Remix before compiling.
+// Deploy this first, then pass its address to ObserverTest.
+
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title ObserverFund
- * @notice Abstract base that manages the FIDC fund registry.
- *         Provides the data model, internal write, and all public read functions.
- *         Access control (onlyOwner etc.) is enforced by the inheriting contract.
+ * @notice Standalone FIDC fund registry.
+ *         Deploy independently; pass this address to Observer on deployment.
  */
-abstract contract ObserverFund {
+contract ObserverFund is Ownable {
 
     // ─── Errors ─────────────────────────────────────────────────────────────
 
@@ -34,33 +35,33 @@ abstract contract ObserverFund {
     }
 
     struct FundInfo {
-        string  fundId;              // Capitare fund UUID
-        string  name;                // e.g. "Horizonte Crédito Multirrede FIDC — Piloto XDC"
-        string  xdcNetwork;          // "eip155:51"
-        address xdcFidcManager;      // fidc-manager contract
-        address xdcStable;           // BRL-CVM stable token (ERC-20)
-        address xdcEscrowFactory;    // escrow-factory contract
-        string  xrplNetwork;         // "xrpl:testnet"
-        string  xrplIssuer;          // XRPL issuer address (r…)
-        string  debentureCurrency;   // "CVD"
+        string  fundId;
+        string  name;
+        string  xdcNetwork;
+        address xdcFidcManager;
+        address xdcStable;
+        address xdcEscrowFactory;
+        string  xrplNetwork;
+        string  xrplIssuer;
+        string  debentureCurrency;
     }
 
     // ─── State ───────────────────────────────────────────────────────────────
 
     FundInfo[]                 private _funds;
-    mapping(string => uint256) private _fundIdToIndex;   // 1-based; 0 = not registered
+    mapping(string => uint256) private _fundIdToIndex;
 
     // ─── Events ──────────────────────────────────────────────────────────────
 
-    event FundRegistered(
-        uint256 indexed fundIdx,
-        string  indexed fundId,
-        string          name
-    );
+    event FundRegistered(uint256 indexed fundIdx, string indexed fundId, string name);
 
-    // ─── Internal Write ───────────────────────────────────────────────────────
+    // ─── Constructor ─────────────────────────────────────────────────────────
 
-    function _registerFund(FundInput calldata f) internal {
+    constructor(address _owner) Ownable(_owner) {}
+
+    // ─── Write ────────────────────────────────────────────────────────────────
+
+    function registerFund(FundInput calldata f) external onlyOwner {
         if (_fundIdToIndex[f.fundId] != 0) revert FundAlreadyRegistered();
         _funds.push(FundInfo({
             fundId: f.fundId, name: f.name,
@@ -73,7 +74,7 @@ abstract contract ObserverFund {
         emit FundRegistered(_funds.length - 1, f.fundId, f.name);
     }
 
-    // ─── Public Views ─────────────────────────────────────────────────────────
+    // ─── Views ────────────────────────────────────────────────────────────────
 
     function isFundRegistered(string calldata fundId) external view returns (bool) {
         return _fundIdToIndex[fundId] != 0;
