@@ -278,20 +278,38 @@ function AdminPanel({ signer }) {
   )
 }
 
+const PILOT_FUND_VALUES = {
+  fundId:            CAPITARE_FUND_ID,
+  name:              'Horizonte Crédito Multirrede FIDC — Piloto XDC',
+  xdcNetwork:        'eip155:51',
+  xdcFidcManager:    XDC_FIDC_MANAGER,
+  xdcStable:         XDC_STABLE,
+  xdcEscrowFactory:  XDC_ESCROW_FACTORY,
+  xrplNetwork:       'xrpl:testnet',
+  xrplIssuer:        'r9aceEB7Qy5JrHtYt2KGhF4KVMgEGjoY2U',
+  debentureCurrency: 'CVD',
+}
+const EMPTY_FUND = Object.fromEntries(Object.keys(PILOT_FUND_VALUES).map(k => [k, '']))
+
 function RegisterFundPanel({ signer }) {
-  const [form, setForm] = useState({
-    fundId: '',
-    name: '',
-    xdcNetwork: '',
-    xdcFidcManager: '',
-    xdcStable: '',
-    xdcEscrowFactory: '',
-    xrplNetwork: '',
-    xrplIssuer: '',
-    debentureCurrency: '',
-  })
+  const [form, setForm] = useState(EMPTY_FUND)
+  const [alreadyRegistered, setAlreadyRegistered] = useState(false)
   const [status, setStatus] = useState('idle')
   const [msg, setMsg] = useState(null)
+
+  useEffect(() => {
+    if (!OBSERVER_ADDRESS) return
+    const ro = new ethers.JsonRpcProvider(SEPOLIA_RPC)
+    const c  = new ethers.Contract(OBSERVER_ADDRESS, OBSERVER_ABI, ro)
+    c.isFundRegistered(CAPITARE_FUND_ID).then(registered => {
+      if (registered) {
+        setAlreadyRegistered(true)
+        setForm(EMPTY_FUND)
+      } else {
+        setForm(PILOT_FUND_VALUES)
+      }
+    }).catch(() => {})
+  }, [])
 
   async function submit() {
     setStatus('loading')
@@ -334,8 +352,10 @@ function RegisterFundPanel({ signer }) {
         <span className="fn-name">registerFund</span>
         <span className="fn-badge write">write / admin</span>
       </div>
-      <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>
-        Pre-filled with pilot values. Call once after deploying Observer.sol.
+      <p style={{ fontSize: 12, color: alreadyRegistered ? 'var(--green)' : 'var(--text-dim)', marginBottom: 10 }}>
+        {alreadyRegistered
+          ? `Fund already registered on-chain — form is empty for a new fund.`
+          : `Pre-filled with pilot values. Call once after deploying Observer.sol.`}
       </p>
       <div className="fn-inputs" style={{ flexDirection: 'column' }}>
         {fields.map(([key, label]) => (
