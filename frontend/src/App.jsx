@@ -22,11 +22,11 @@ export default function App() {
             <NavLink to="/" end className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
               Dashboard
             </NavLink>
-            <NavLink to="/orders" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
-              Orders
-            </NavLink>
             <NavLink to="/observer" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
               Observer
+            </NavLink>
+            <NavLink to="/orders" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+              Orders
             </NavLink>
             <NavLink to="/xdc" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
               XDC
