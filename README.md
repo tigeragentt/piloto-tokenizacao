@@ -71,7 +71,7 @@ List all orders for the fund:
 curl -s \
   -H "X-Observer-Id: $OBSERVER_ID" \
   -H "X-Observer-Key: $OBSERVER_KEY" \
-  "$BASE/funds/$FUND/debenture-orders" | jq .
+  "$BASE/funds/$FUND/debenture-orders" | python -m json.tool
 ```
 
 Get settlement for the test order:
@@ -79,7 +79,7 @@ Get settlement for the test order:
 curl -s \
   -H "X-Observer-Id: $OBSERVER_ID" \
   -H "X-Observer-Key: $OBSERVER_KEY" \
-  "$BASE/funds/$FUND/debenture-orders/$ORDER/settlement" | jq .
+  "$BASE/funds/$FUND/debenture-orders/$ORDER/settlement" | python -m json.tool
 ```
 
 Get proof for the test order:
@@ -87,7 +87,7 @@ Get proof for the test order:
 curl -s \
   -H "X-Observer-Id: $OBSERVER_ID" \
   -H "X-Observer-Key: $OBSERVER_KEY" \
-  "$BASE/funds/$FUND/debenture-orders/$ORDER/proof" | jq .
+  "$BASE/funds/$FUND/debenture-orders/$ORDER/proof" | python -m json.tool
 ```
 
 **Option B — run CRE simulate against the real staging API**
