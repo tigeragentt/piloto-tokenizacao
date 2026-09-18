@@ -280,15 +280,15 @@ function AdminPanel({ signer }) {
 
 function RegisterFundPanel({ signer }) {
   const [form, setForm] = useState({
-    fundId: CAPITARE_FUND_ID,
-    name: 'Horizonte Crédito Multirrede FIDC — Piloto XDC',
-    xdcNetwork: 'eip155:51',
-    xdcFidcManager: XDC_FIDC_MANAGER,
-    xdcStable: XDC_STABLE,
-    xdcEscrowFactory: XDC_ESCROW_FACTORY,
-    xrplNetwork: 'xrpl:testnet',
-    xrplIssuer: 'r9aceEB7Qy5JrHtYt2KGhF4KVMgEGjoY2U',
-    debentureCurrency: 'CVD',
+    fundId: '',
+    name: '',
+    xdcNetwork: '',
+    xdcFidcManager: '',
+    xdcStable: '',
+    xdcEscrowFactory: '',
+    xrplNetwork: '',
+    xrplIssuer: '',
+    debentureCurrency: '',
   })
   const [status, setStatus] = useState('idle')
   const [msg, setMsg] = useState(null)
