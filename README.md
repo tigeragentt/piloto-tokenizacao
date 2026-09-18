@@ -190,6 +190,71 @@ For Remix contract testing, see `test/remix-inputs.md` — copy-paste values for
 
 ---
 
+## Frontend
+
+React + Vite dashboard. Pages: Dashboard, Orders, Observer, Capitare, XDC, CRE.
+
+### Local dev
+
+```bash
+cd frontend
+npm install
+```
+
+Create `frontend/.env` (gitignored):
+
+```
+OBSERVER_ADDRESS=0x84E0439Da40a543E45847841393d71A45A715537
+```
+
+Start the dev server:
+
+```bash
+npm run dev
+# http://localhost:5175
+```
+
+The Vite dev server proxies `/capitare-api` → Capitare staging API automatically, so no CORS issues in dev.
+
+To test against the local mock server instead of the real API, set in `frontend/.env`:
+
+```
+CAPITARE_BASE=http://localhost:3001
+```
+
+### Build for production
+
+```bash
+npm run build
+# output: frontend/dist/
+```
+
+Preview the production build locally before publishing:
+
+```bash
+npm run preview
+```
+
+### Publish (static hosting)
+
+The `dist/` folder is a standard SPA — deploy to any static host:
+
+**GitHub Pages:**
+```bash
+npm run build
+# push frontend/dist/ to the gh-pages branch, or use gh-pages package
+npx gh-pages -d dist
+```
+
+**Netlify / Vercel / Cloudflare Pages:**
+- Build command: `npm run build`
+- Output directory: `dist`
+- Set `OBSERVER_ADDRESS` as an environment variable in the hosting dashboard
+
+> Remember to set `OBSERVER_ADDRESS` as an env var in the hosting platform, not just in local `.env`.
+
+---
+
 ## Setup
 
 ### Smart contracts
