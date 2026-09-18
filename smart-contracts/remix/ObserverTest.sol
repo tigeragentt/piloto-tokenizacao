@@ -2,64 +2,33 @@
 pragma solidity 0.8.36;
 
 import {ReceiverTemplate} from "./ReceiverTemplate.sol";
+import {ObserverFund} from "./ObserverFund.sol";
 
 /**
  * @title ObserverTest
- * @notice Remix-only deploy target — mirrors Observer.sol v1.3.0 exactly but:
+ * @notice Remix-only deploy target — mirrors Observer.sol v1.4.0 exactly but:
  *           1. No-arg constructor (defaults to Sepolia simulation forwarder)
  *           2. reportSettlement() and reportAction() are public (no onlyOwner) for easier Remix testing
  *         Do NOT deploy this to production. Use contracts/Observer.sol instead.
  *
- * @dev Load BOTH ReceiverTemplate.sol and ObserverTest.sol into Remix before compiling.
+ * @dev Load ReceiverTemplate.sol, ObserverFund.sol, and ObserverTest.sol into Remix before compiling.
  */
-contract ObserverTest is ReceiverTemplate {
+contract ObserverTest is ReceiverTemplate, ObserverFund {
 
     // ─── Errors ─────────────────────────────────────────────────────────────
+    // NotFound / InvalidRange / OutOfBounds / FundAlreadyRegistered come from ObserverFund
 
-    error FundAlreadyRegistered();
     error ActionAlreadyAnchored();
     error OrderAlreadyAnchored();
-    error NotFound();
-    error InvalidRange();
-    error OutOfBounds();
 
     // ─── Constants ───────────────────────────────────────────────────────────
 
-    string public constant VERSION = "1.3.0";
+    string public constant VERSION = "1.4.0";
 
     // Sepolia simulation forwarder — default for no-arg constructor.
     // Call setForwarderAddress() to switch.
     // Production: 0xF8344CFd5c43616a4366C34E3EEE75af79a74482
     address private constant SIMULATION_FORWARDER = 0x15fC6ae953E024d975e77382eEeC56A9101f9F88;
-
-    // ─── Fund Registry ───────────────────────────────────────────────────────
-
-    struct FundInput {
-        string  fundId;
-        string  name;
-        string  xdcNetwork;
-        address xdcFidcManager;
-        address xdcStable;
-        address xdcEscrowFactory;
-        string  xrplNetwork;
-        string  xrplIssuer;
-        string  debentureCurrency;
-    }
-
-    struct FundInfo {
-        string  fundId;
-        string  name;
-        string  xdcNetwork;
-        address xdcFidcManager;
-        address xdcStable;
-        address xdcEscrowFactory;
-        string  xrplNetwork;
-        string  xrplIssuer;
-        string  debentureCurrency;
-    }
-
-    FundInfo[]                 private _funds;
-    mapping(string => uint256) private _fundIdToIndex;
 
     // ─── General Action Log ──────────────────────────────────────────────────
 
@@ -119,8 +88,6 @@ contract ObserverTest is ReceiverTemplate {
 
     // ─── Events ──────────────────────────────────────────────────────────────
 
-    event FundRegistered(uint256 indexed fundIdx, string indexed fundId, string name);
-
     event ActionReported(
         uint256    indexed recordId,
         string     indexed network,
@@ -151,16 +118,7 @@ contract ObserverTest is ReceiverTemplate {
     // ─── Admin ────────────────────────────────────────────────────────────────
 
     function registerFund(FundInput calldata f) external onlyOwner {
-        if (_fundIdToIndex[f.fundId] != 0) revert FundAlreadyRegistered();
-        _funds.push(FundInfo({
-            fundId: f.fundId, name: f.name,
-            xdcNetwork: f.xdcNetwork, xdcFidcManager: f.xdcFidcManager,
-            xdcStable: f.xdcStable, xdcEscrowFactory: f.xdcEscrowFactory,
-            xrplNetwork: f.xrplNetwork, xrplIssuer: f.xrplIssuer,
-            debentureCurrency: f.debentureCurrency
-        }));
-        _fundIdToIndex[f.fundId] = _funds.length;
-        emit FundRegistered(_funds.length - 1, f.fundId, f.name);
+        _registerFund(f);
     }
 
     // ─── Write (public for Remix testing convenience) ─────────────────────────
@@ -223,10 +181,6 @@ contract ObserverTest is ReceiverTemplate {
     }
 
     // ─── Existence Checks ─────────────────────────────────────────────────────
-
-    function isFundRegistered(string calldata fundId) external view returns (bool) {
-        return _fundIdToIndex[fundId] != 0;
-    }
 
     function isActionAnchored(string calldata network, string calldata txHash) external view returns (bool) {
         return _txAnchored[keccak256(abi.encodePacked(network, txHash))];
@@ -292,35 +246,5 @@ contract ObserverTest is ReceiverTemplate {
         uint256 n = toIndex - fromIndex + 1;
         result = new ActionRecord[](n);
         for (uint256 i = 0; i < n; i++) result[i] = _actions[fromIndex + i];
-    }
-
-    // ─── Fund Views ───────────────────────────────────────────────────────────
-
-    function getFundCount() external view returns (uint256) { return _funds.length; }
-
-    function getFund(uint256 idx) external view returns (FundInfo memory) {
-        if (idx >= _funds.length) revert NotFound();
-        return _funds[idx];
-    }
-
-    function getFundById(string calldata fundId) external view returns (FundInfo memory) {
-        uint256 idx = _fundIdToIndex[fundId];
-        if (idx == 0) revert NotFound();
-        return _funds[idx - 1];
-    }
-
-    function getLatestFunds(uint256 count) external view returns (FundInfo[] memory result) {
-        uint256 total = _funds.length;
-        uint256 n = count > total ? total : count;
-        result = new FundInfo[](n);
-        for (uint256 i = 0; i < n; i++) result[i] = _funds[total - n + i];
-    }
-
-    function getFunds(uint256 fromIndex, uint256 toIndex) external view returns (FundInfo[] memory result) {
-        if (fromIndex > toIndex) revert InvalidRange();
-        if (toIndex >= _funds.length) revert OutOfBounds();
-        uint256 n = toIndex - fromIndex + 1;
-        result = new FundInfo[](n);
-        for (uint256 i = 0; i < n; i++) result[i] = _funds[fromIndex + i];
     }
 }
