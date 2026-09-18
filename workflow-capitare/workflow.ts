@@ -304,6 +304,9 @@ const scanAndAnchor = async (runtime: Runtime<Config>): Promise<ScanResult> => {
   const { items: orders } = ordersData as OrdersResponse
   result.ordersChecked = orders.length
   runtime.log(`Found ${orders.length} order(s)`)
+  for (const o of orders) {
+    runtime.log(`  Order ${o.id}: progress=${o.progress} intentHash=${o.intentHash}`)
+  }
 
   for (const order of orders) {
     if (order.progress !== "ACQUIRED_WITH_LOCK") {
