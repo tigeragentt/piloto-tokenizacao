@@ -1,9 +1,9 @@
 staging-settings:
-  evms:
-    - chain-selector: "16015286601757825753"   # Ethereum Sepolia
-      rpc-url: "https://ethereum-sepolia-rpc.publicnode.com"
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia
+      url: "https://ethereum-sepolia-rpc.publicnode.com"
 
 production-settings:
-  evms:
-    - chain-selector: "16015286601757825753"   # Ethereum Sepolia (pilot uses testnet for Observer)
-      rpc-url: "https://ethereum-sepolia-rpc.publicnode.com"
+  rpcs:
+    - chain-name: ethereum-testnet-sepolia
+      url: "https://ethereum-sepolia-rpc.publicnode.com"
