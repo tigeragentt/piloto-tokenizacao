@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
 import { ethers } from 'ethers'
-import { OBSERVER_ABI } from '../abi.js'
+import { OBSERVER_ABI, OBSERVER_FUND_ABI } from '../abi.js'
 import {
-  SEPOLIA_RPC, SEPOLIA_NETWORK_PARAMS, OBSERVER_ADDRESS,
-  REPORTER_ROLE_HASH, DEFAULT_ADMIN_ROLE,
-  shortHash, isZeroBytes32, sepoliaBlockUrl, sepoliaTxUrl,
+  SEPOLIA_RPC, OBSERVER_ADDRESS, OBSERVER_FUND_ADDRESS,
+  shortHash, isZeroBytes32, sepoliaBlockUrl,
   formatTimestamp,
   CAPITARE_FUND_ID, XDC_FIDC_MANAGER, XDC_STABLE, XDC_ESCROW_FACTORY,
 } from '../config.js'
@@ -20,23 +19,25 @@ function ObserverNotDeployed() {
       <div className="card-title">Observer.sol — Address Not Configured</div>
       <div className="alert alert-warn" style={{ marginBottom: 12 }}>
         <code>OBSERVER_ADDRESS</code> is not set in <code>frontend/.env</code>.
-        Set it to the deployed Observer (or ObserverTest) address on Sepolia and restart the frontend.
+        Deploy both contracts and set both addresses before starting the frontend.
       </div>
-      <div className="section-label">Quick Start (ObserverTest already deployed)</div>
+      <div className="section-label">Deploy order (Sepolia)</div>
       <ol style={{ fontSize: 13, color: 'var(--text-dim)', paddingLeft: 20, lineHeight: 2.2 }}>
-        <li>Add to <code>frontend/.env</code>: <code>OBSERVER_ADDRESS=0x84E0439Da40a543E45847841393d71A45A715537</code></li>
+        <li>Deploy <strong>ObserverFund</strong> — no args (deployer becomes owner)</li>
+        <li>Copy <code>ObserverFund</code> address</li>
+        <li>Deploy <strong>Observer</strong> — pass <code>(forwarderAddress, observerFundAddress)</code></li>
+        <li>Set <code>observerAddress</code> in <code>workflow-capitare/config/config.staging.json</code></li>
+        <li>Add to <code>frontend/.env</code>:<br />
+          <code>OBSERVER_ADDRESS=0x...</code><br />
+          <code>OBSERVER_FUND_ADDRESS=0x...</code>
+        </li>
         <li>Restart the frontend</li>
       </ol>
-      <div className="section-label" style={{ marginTop: 12 }}>Deploy Production Observer.sol</div>
-      <ol style={{ fontSize: 13, color: 'var(--text-dim)', paddingLeft: 20, lineHeight: 2.2 }}>
-        <li>Install: <code>cd smart-contracts &amp;&amp; npm install</code></li>
-        <li>Compile: <code>npx hardhat compile</code></li>
-        <li>Deploy to Sepolia: <code>npx hardhat run scripts/deploy.js --network sepolia</code></li>
-        <li>Copy the deployed address</li>
-        <li>Set <code>observerAddress</code> in <code>workflow-capitare/config/config.staging.json</code></li>
-        <li>Grant <code>REPORTER_ROLE</code> to the CRE wallet on the deployed contract</li>
-        <li>Set <code>OBSERVER_ADDRESS=0x...</code> in <code>frontend/.env</code> and restart</li>
-      </ol>
+      <div className="section-label" style={{ marginTop: 12 }}>Forwarder addresses</div>
+      <p style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+        Simulation Sepolia: <code>0x15fC6ae953E024d975e77382eEeC56A9101f9F88</code><br />
+        Production Sepolia: <code>0xF8344CFd5c43616a4366C34E3EEE75af79a74482</code>
+      </p>
     </div>
   )
 }
@@ -207,17 +208,19 @@ function LookupPanel({ observerContract }) {
 }
 
 function AdminPanel({ signer }) {
-  const [role, setRole]    = useState(REPORTER_ROLE_HASH)
-  const [addr, setAddr]    = useState('')
-  const [status, setStatus] = useState('idle')
-  const [msg, setMsg]      = useState(null)
+  const [forwarder, setForwarder]   = useState('')
+  const [workflowId, setWorkflowId] = useState('')
+  const [author, setAuthor]         = useState('')
+  const [status, setStatus]         = useState('idle')
+  const [msg, setMsg]               = useState(null)
 
-  async function send(fnName) {
+  async function call(fnName, value) {
+    if (!value.trim()) return
     setStatus('loading')
     setMsg(null)
     try {
       const contract = new ethers.Contract(OBSERVER_ADDRESS, OBSERVER_ABI, signer)
-      const tx = await contract[fnName](role, addr.trim())
+      const tx = await contract[fnName](value.trim())
       setMsg(`Tx sent: ${tx.hash}`)
       setStatus('pending')
       const receipt = await tx.wait()
@@ -229,51 +232,55 @@ function AdminPanel({ signer }) {
     }
   }
 
-  const ROLES = [
-    { label: 'REPORTER_ROLE', value: REPORTER_ROLE_HASH },
-    { label: 'DEFAULT_ADMIN_ROLE', value: DEFAULT_ADMIN_ROLE },
-  ]
-
   return (
     <div className="fn-card">
       <div className="fn-header">
-        <span className="fn-name">grantRole / revokeRole</span>
+        <span className="fn-name">Observer security setters (onlyOwner)</span>
         <span className="fn-badge write">write</span>
       </div>
-      <div className="fn-inputs">
-        <div className="fn-input-group">
-          <label className="fn-input-label">role (bytes32)</label>
+      <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>
+        Observer uses <code>Ownable</code> — only the deployer wallet can call these.
+      </p>
+
+      <div className="fn-inputs" style={{ flexDirection: 'column', gap: 12 }}>
+        <div className="fn-input-group" style={{ width: '100%' }}>
+          <label className="fn-input-label">setForwarderAddress (address)</label>
           <div style={{ display: 'flex', gap: 8 }}>
-            <select className="fn-input" style={{ flex: '0 0 160px', cursor: 'pointer' }}
-              value={ROLES.find(r => r.value === role)?.label || ''}
-              onChange={e => {
-                const r = ROLES.find(x => x.label === e.target.value)
-                if (r) setRole(r.value)
-              }}
-            >
-              {ROLES.map(r => <option key={r.label}>{r.label}</option>)}
-            </select>
-            <input className="fn-input" style={{ flex: 1 }} value={role}
-              onChange={e => setRole(e.target.value)} />
+            <input className="fn-input" style={{ flex: 1 }}
+              placeholder="0x15fC6ae953E024d975e77382eEeC56A9101f9F88"
+              value={forwarder} onChange={e => setForwarder(e.target.value)} />
+            <button className="btn btn-primary btn-sm"
+              disabled={!forwarder || status === 'loading' || status === 'pending'}
+              onClick={() => call('setForwarderAddress', forwarder)}>Set</button>
           </div>
         </div>
-        <div className="fn-input-group" style={{ flex: 1 }}>
-          <label className="fn-input-label">account (address)</label>
-          <input className="fn-input" style={{ minWidth: 340 }} placeholder="0x..." value={addr}
-            onChange={e => setAddr(e.target.value)} />
+
+        <div className="fn-input-group" style={{ width: '100%' }}>
+          <label className="fn-input-label">setExpectedWorkflowId (bytes32)</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input className="fn-input" style={{ flex: 1 }}
+              placeholder="0x..."
+              value={workflowId} onChange={e => setWorkflowId(e.target.value)} />
+            <button className="btn btn-primary btn-sm"
+              disabled={!workflowId || status === 'loading' || status === 'pending'}
+              onClick={() => call('setExpectedWorkflowId', workflowId)}>Set</button>
+          </div>
+        </div>
+
+        <div className="fn-input-group" style={{ width: '100%' }}>
+          <label className="fn-input-label">setExpectedAuthor (address)</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input className="fn-input" style={{ flex: 1 }}
+              placeholder="CRE workflow owner address"
+              value={author} onChange={e => setAuthor(e.target.value)} />
+            <button className="btn btn-primary btn-sm"
+              disabled={!author || status === 'loading' || status === 'pending'}
+              onClick={() => call('setExpectedAuthor', author)}>Set</button>
+          </div>
         </div>
       </div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button className="btn btn-primary btn-sm" disabled={!addr || status === 'loading' || status === 'pending'}
-          onClick={() => send('grantRole')}>
-          Grant Role
-        </button>
-        <button className="btn btn-danger btn-sm" disabled={!addr || status === 'loading' || status === 'pending'}
-          onClick={() => send('revokeRole')}>
-          Revoke Role
-        </button>
-      </div>
-      {msg && <div className={`fn-result ${status}`}>{msg}</div>}
+
+      {msg && <div className={`fn-result ${status === 'pending' ? 'pending' : status}`}>{msg}</div>}
     </div>
   )
 }
@@ -298,9 +305,9 @@ function RegisterFundPanel({ signer }) {
   const [msg, setMsg] = useState(null)
 
   useEffect(() => {
-    if (!OBSERVER_ADDRESS) return
+    if (!OBSERVER_FUND_ADDRESS) return
     const ro = new ethers.JsonRpcProvider(SEPOLIA_RPC)
-    const c  = new ethers.Contract(OBSERVER_ADDRESS, OBSERVER_ABI, ro)
+    const c  = new ethers.Contract(OBSERVER_FUND_ADDRESS, OBSERVER_FUND_ABI, ro)
     c.isFundRegistered(CAPITARE_FUND_ID).then(registered => {
       if (registered) {
         setAlreadyRegistered(true)
@@ -315,7 +322,7 @@ function RegisterFundPanel({ signer }) {
     setStatus('loading')
     setMsg(null)
     try {
-      const contract = new ethers.Contract(OBSERVER_ADDRESS, OBSERVER_ABI, signer)
+      const contract = new ethers.Contract(OBSERVER_FUND_ADDRESS, OBSERVER_FUND_ABI, signer)
       const tx = await contract.registerFund({
         fundId:            form.fundId,
         name:              form.name,
@@ -457,7 +464,7 @@ export default function ObserverPage() {
       </div>
 
       {/* ── Admin ── */}
-      <div className="section-label">Admin (requires DEFAULT_ADMIN_ROLE on Sepolia)</div>
+      <div className="section-label">Admin (requires deployer wallet on Sepolia)</div>
       {!account ? (
         <div className="connect-bar">
           <button className="btn btn-primary" onClick={() => connect(

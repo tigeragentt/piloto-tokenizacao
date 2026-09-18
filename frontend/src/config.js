@@ -21,15 +21,12 @@ export const XDC_NETWORK_PARAMS = {
   blockExplorerUrls: ['https://testnet.xdcscan.com'],
 }
 
-// ─── Observer.sol (Sepolia) ────────────────────────────────────────────────────
+// ─── Observer.sol + ObserverFund.sol (Sepolia) ────────────────────────────────
 
 // Set once deployed; empty string disables Observer reads/writes
-export const OBSERVER_ADDRESS = import.meta.env.OBSERVER_ADDRESS || ''
-
-export const REPORTER_ROLE = '0x' + 'reporter_role'.padEnd(0, '0')
-// Actual computed value — keccak256("REPORTER_ROLE")
-export const REPORTER_ROLE_HASH = '0x3f50c46dd8af3b8b06bb07a1818bf33ffd94a694d05e7698aaef2b38bbf39d87'
-export const DEFAULT_ADMIN_ROLE = '0x0000000000000000000000000000000000000000000000000000000000000000'
+export const OBSERVER_ADDRESS      = import.meta.env.OBSERVER_ADDRESS      || ''
+// ObserverFund is deployed separately — pass its address to Observer at deploy time
+export const OBSERVER_FUND_ADDRESS = import.meta.env.OBSERVER_FUND_ADDRESS || ''
 
 // ─── XDC Pilot Contracts (Apothem, chain 51) ───────────────────────────────────
 

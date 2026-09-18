@@ -1,4 +1,4 @@
-// Observer.sol ABI — only the functions the frontend needs
+// Observer.sol + ObserverFund.sol ABIs — only the functions the frontend needs
 
 const SETTLEMENT_RECORD_COMPONENTS = [
   { name: 'orderId',              type: 'string'  },
@@ -26,6 +26,8 @@ const FUND_INFO_COMPONENTS = [
   { name: 'debentureCurrency',  type: 'string'  },
 ]
 
+// Observer.sol (v1.5.0) — settlement proof registry + ReceiverTemplate security setters
+// Fund management moved to ObserverFund.sol — use OBSERVER_FUND_ABI for fund reads/writes
 export const OBSERVER_ABI = [
   // ─── View ───────────────────────────────────────────────────────────────────
   {
@@ -36,17 +38,31 @@ export const OBSERVER_ABI = [
     stateMutability: 'view',
   },
   {
+    name: 'fund',
+    type: 'function',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    name: 'getForwarderAddress',
+    type: 'function',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    name: 'getExpectedWorkflowId',
+    type: 'function',
+    inputs: [],
+    outputs: [{ name: '', type: 'bytes32' }],
+    stateMutability: 'view',
+  },
+  {
     name: 'getSettlementCount',
     type: 'function',
     inputs: [],
     outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    name: 'isFundRegistered',
-    type: 'function',
-    inputs: [{ name: 'fundId', type: 'string' }],
-    outputs: [{ name: '', type: 'bool' }],
     stateMutability: 'view',
   },
   {
@@ -111,6 +127,41 @@ export const OBSERVER_ABI = [
     outputs: [{ name: 'result', type: 'tuple[]', components: SETTLEMENT_RECORD_COMPONENTS }],
     stateMutability: 'view',
   },
+
+  // ─── Write (onlyOwner via ReceiverTemplate) ─────────────────────────────────
+  {
+    name: 'setForwarderAddress',
+    type: 'function',
+    inputs: [{ name: '_forwarder', type: 'address' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    name: 'setExpectedAuthor',
+    type: 'function',
+    inputs: [{ name: '_author', type: 'address' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    name: 'setExpectedWorkflowId',
+    type: 'function',
+    inputs: [{ name: '_id', type: 'bytes32' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+]
+
+// ObserverFund.sol — FIDC fund registry (deployed separately, address passed to Observer)
+export const OBSERVER_FUND_ABI = [
+  // ─── View ───────────────────────────────────────────────────────────────────
+  {
+    name: 'isFundRegistered',
+    type: 'function',
+    inputs: [{ name: 'fundId', type: 'string' }],
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'view',
+  },
   {
     name: 'getFundCount',
     type: 'function',
@@ -126,40 +177,21 @@ export const OBSERVER_ABI = [
     stateMutability: 'view',
   },
   {
-    name: 'hasRole',
+    name: 'getFundById',
     type: 'function',
-    inputs: [
-      { name: 'role',    type: 'bytes32' },
-      { name: 'account', type: 'address' },
-    ],
-    outputs: [{ type: 'bool' }],
+    inputs: [{ name: 'fundId', type: 'string' }],
+    outputs: [{ name: '', type: 'tuple', components: FUND_INFO_COMPONENTS }],
+    stateMutability: 'view',
+  },
+  {
+    name: 'getLatestFunds',
+    type: 'function',
+    inputs: [{ name: 'count', type: 'uint256' }],
+    outputs: [{ name: 'result', type: 'tuple[]', components: FUND_INFO_COMPONENTS }],
     stateMutability: 'view',
   },
 
-  // ─── Write ──────────────────────────────────────────────────────────────────
-  {
-    name: 'reportSettlement',
-    type: 'function',
-    inputs: [
-      {
-        name: 's',
-        type: 'tuple',
-        components: [
-          { name: 'orderId',             type: 'string'  },
-          { name: 'intentHash',          type: 'bytes32' },
-          { name: 'progress',            type: 'string'  },
-          { name: 'technicalCompleted',  type: 'bool'    },
-          { name: 'accountingCompleted', type: 'bool'    },
-          { name: 'deliveryProofSHA256', type: 'bytes32' },
-          { name: 'resolutionHash',      type: 'bytes32' },
-          { name: 'sourceNetwork',       type: 'string'  },
-          { name: 'destinationNetwork',  type: 'string'  },
-        ],
-      },
-    ],
-    outputs: [{ name: 'recordId', type: 'uint256' }],
-    stateMutability: 'nonpayable',
-  },
+  // ─── Write (onlyOwner) ───────────────────────────────────────────────────────
   {
     name: 'registerFund',
     type: 'function',
@@ -179,26 +211,6 @@ export const OBSERVER_ABI = [
           { name: 'debentureCurrency',  type: 'string'  },
         ],
       },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    name: 'grantRole',
-    type: 'function',
-    inputs: [
-      { name: 'role',    type: 'bytes32' },
-      { name: 'account', type: 'address' },
-    ],
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    name: 'revokeRole',
-    type: 'function',
-    inputs: [
-      { name: 'role',    type: 'bytes32' },
-      { name: 'account', type: 'address' },
     ],
     outputs: [],
     stateMutability: 'nonpayable',

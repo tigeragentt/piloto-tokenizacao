@@ -36,7 +36,17 @@ escrow proxy (per-order, EIP-1167)
 ## Repository structure
 
 ```
-smart-contracts/         Observer.sol (Hardhat, Sepolia)
+smart-contracts/
+  contracts/
+    Observer.sol         v1.5.0 — settlement/action proof registry, ReceiverTemplate
+    ObserverFund.sol     Standalone FIDC fund registry (deployed separately)
+    interfaces/          ReceiverTemplate.sol, IReceiver
+  remix/                 Testnet/Remix versions (T-prefix, independent versioning)
+    IObserverFunds.sol   Interface — single source of truth for fund structs
+    TObserverFunds.sol   v1.1.0 — AccessControl, implements IObserverFunds
+    TObserver.sol        v1.2.0 — ReceiverTemplate + fundId in structs
+    ReceiverTemplate.sol Flat copy for Remix (no imports needed)
+    ObserverTestV1.sol   v1.0.0 — original monolithic contract, kept for comparison
 workflow-capitare/       CRE workflow: polls Capitare API, anchors proofs on-chain
 frontend/                React dashboard (Vite) — Dashboard, Orders, Observer, XDC, CRE pages
 project.yaml             CRE project config (Sepolia chain selector + RPC)
@@ -112,34 +122,45 @@ cre workflow simulate workflow-capitare --target test-settings --non-interactive
 
 ---
 
-## Observer.sol — CRE Receiver pattern (v1.2.0)
+## Observer contracts
 
-Observer.sol follows the [ReceiverTemplate](https://github.com/tigeragentt/cre-world-cup-prediction-market/blob/main/contracts/interfaces/ReceiverTemplate.sol) pattern for receiving DON-signed reports from the Chainlink KeystoneForwarder.
+### Two-contract architecture (v1.5.0)
 
-### Interface
+Observer is now split into two independently deployable contracts:
 
-```solidity
-interface IReceiver is IERC165 {
-    function onReport(bytes calldata metadata, bytes calldata report) external;
-}
-```
+| Contract | Role | Access control |
+|---|---|---|
+| `ObserverFund.sol` | FIDC fund registry | `Ownable` — only deployer can `registerFund` |
+| `Observer.sol` | Settlement/action proof registry + CRE receiver | `Ownable` (via ReceiverTemplate) |
 
-Observer implements `IReceiver` and returns `true` for `supportsInterface(type(IReceiver).interfaceId)`.
-
-### Constructor
-
-The forwarder address is **required at deploy time** — `address(0)` reverts:
+Observer stores a reference to ObserverFund and reads from it:
 
 ```solidity
-constructor(address _forwarderAddress)
+ObserverFund public fund;
 ```
+
+Observer's constructor:
+
+```solidity
+constructor(address _forwarderAddress, address _fund)
+```
+
+**Deployment order:**
+1. Deploy `ObserverFund(deployerAddress)`
+2. Deploy `Observer(forwarderAddress, observerFundAddress)`
 
 | Network | Forwarder address |
 |---|---|
 | Ethereum Sepolia — simulation | `0x15fC6ae953E024d975e77382eEeC56A9101f9F88` |
 | Ethereum Sepolia — production | `0xF8344CFd5c43616a4366C34E3EEE75af79a74482` |
 
-### Security setters (DEFAULT_ADMIN_ROLE)
+### ReceiverTemplate pattern
+
+```
+KeystoneForwarder → onReport() → security checks → _processReport() → _reportSettlement()
+```
+
+### Security setters (onlyOwner)
 
 | Function | Purpose |
 |---|---|
@@ -152,86 +173,79 @@ After deploying and registering the workflow in CRE, call `setExpectedWorkflowId
 
 ### Write paths
 
-| Caller | Function | When to use |
+| Caller | Contract | Function |
 |---|---|---|
-| Chainlink KeystoneForwarder | `onReport(bytes metadata, bytes report)` | Normal CRE workflow execution |
-| Admin wallet (REPORTER_ROLE) | `reportSettlement(SettlementInput)` | Manual anchoring / recovery |
+| Chainlink KeystoneForwarder | Observer | `onReport(bytes metadata, bytes report)` |
+| Owner wallet | Observer | `reportSettlement(SettlementInput)` |
+| Owner wallet | Observer | `reportAction(...)` |
+| Owner wallet | ObserverFund | `registerFund(FundInput)` |
 
 ---
 
-## Testing with ObserverTest.sol
+## Testing with Remix (T-contracts)
 
-`ObserverTest.sol` is the Remix-ready version of Observer for development testing.
+The `smart-contracts/remix/` folder contains testnet versions with independent versioning. All names start with `T`:
 
-| | Observer.sol | ObserverTest.sol |
+| File | Version | Key differences from production |
 |---|---|---|
-| Deploy via | Hardhat | Remix IDE |
-| Constructor | requires `_forwarderAddress` param | no-arg; defaults to simulation forwarder |
-| REPORTER_ROLE | must be granted manually | auto-granted to `msg.sender` in constructor |
-| Purpose | Production / CRE workflow | Manual testing in Remix |
+| `TObserverFunds.sol` | 1.1.0 | `AccessControl` (ADMIN_ROLE); implements `IObserverFunds` |
+| `TObserver.sol` | 1.2.0 | `fundId` as first field in `SettlementInput` and `ActionRecord`; hardcoded simulation forwarder; public write functions |
+| `IObserverFunds.sol` | — | Interface; defines `FundInput`/`FundInfo` structs |
+| `ObserverTestV1.sol` | 1.0.0 | Original monolithic contract — no CRE receiver, no fund split; kept for reference |
 
-> The previously deployed address `0x84E0439Da40a543E45847841393d71A45A715537` is **stale** (v1.0.0, no `onReport`). Redeploy from `smart-contracts/remix/ObserverTest.sol` (Remix) or `smart-contracts/contracts/Observer.sol` (Hardhat) and update `observerAddress` in `config.staging.json`.
+**Load order in Remix:** `ReceiverTemplate.sol` → `IObserverFunds.sol` → `TObserverFunds.sol` → `TObserver.sol`
+
+**Deploy order:**
+1. Deploy `TObserverFunds` — no args; deployer gets `DEFAULT_ADMIN_ROLE` + `ADMIN_ROLE`
+2. Deploy `TObserver(_fund)` — paste the `TObserverFunds` address
 
 ### Test sequence in Remix
 
-Connect MetaMask to Sepolia, load `smart-contracts/remix/ObserverTest.sol` (self-contained, no imports needed), and run in order:
+Connect MetaMask to Sepolia, then run in order:
 
-**1. registerFund**
+**1. registerFund (on TObserverFunds)**
 
-Paste into the `f` parameter:
 ```
 ["be6f2e8a-5474-43c7-a692-7918c37e3f42","Horizonte Crédito Multirrede FIDC — Piloto XDC","eip155:51","0x0000000000000000000000000000000000000001","0x0000000000000000000000000000000000000002","0x0000000000000000000000000000000000000003","xrpl:testnet","rTestIssuerXXXXXXXXXXXXXXXXXXXXXXXXXX","CVD"]
 ```
+
 Verify: `isFundRegistered("be6f2e8a-5474-43c7-a692-7918c37e3f42")` → `true`
 
-**2. reportSettlement** — order 0001 (ready to anchor)
+**2. reportSettlement (on TObserver) — order 0001**
+
+`fundId` is the **first field** in `SettlementInput` (new in v1.2.0):
+
 ```
-["test-order-0001-ready-to-anchor","0xaabb000000000000000000000000000000000000000000000000000000000001","ACQUIRED_WITH_LOCK",true,true,"0xdeadbeef00000000000000000000000000000000000000000000000000000001","0xcc110000000000000000000000000000000000000000000000000000000001aa","eip155:51","xrpl:testnet"]
+["be6f2e8a-5474-43c7-a692-7918c37e3f42","test-order-0001-ready-to-anchor","0xaabb000000000000000000000000000000000000000000000000000000000001","ACQUIRED_WITH_LOCK",true,true,"0xdeadbeef00000000000000000000000000000000000000000000000000000001","0xcc110000000000000000000000000000000000000000000000000000000001aa","eip155:51","xrpl:testnet"]
 ```
+
 Verify:
 - `isOrderAnchored("test-order-0001-ready-to-anchor")` → `true`
-- `isSettlementAnchored("0xaabb000000000000000000000000000000000000000000000000000000000001")` → `true`
-- Call again with same orderId → reverts with `OrderAlreadyAnchored`
+- `isSettlementAnchored("0xaabb...0001")` → `true`
+- Call again → reverts with `OrderAlreadyAnchored`
+- Call with unregistered fundId → reverts with `FundNotRegistered`
 
-**3. reportSettlement** — order 0003 (already anchored case)
-```
-["test-order-0003-already-anchored","0xaabb000000000000000000000000000000000000000000000000000000000003","ACQUIRED_WITH_LOCK",true,true,"0xdeadbeef00000000000000000000000000000000000000000000000000000003","0xcc110000000000000000000000000000000000000000000000000000000003aa","eip155:51","xrpl:testnet"]
-```
+**3. Test the CRE `onReport` path**
 
-**4. reportSettlement** — order 0004 (technical done, accounting pending)
-```
-["test-order-0004-tech-only","0xaabb000000000000000000000000000000000000000000000000000000000004","ACQUIRED_WITH_LOCK",true,false,"0xdeadbeef00000000000000000000000000000000000000000000000000000004","0xcc110000000000000000000000000000000000000000000000000000000004aa","eip155:51","xrpl:testnet"]
-```
-
-**5. Test the CRE `onReport` path**
-
-The constructor sets the forwarder to the simulation address. To call `onReport` from your MetaMask wallet:
-
-```
+```solidity
 setForwarderAddress(YOUR_METAMASK_ADDRESS)
+// call onReport with metadata = 0x, report = abi.encode(SettlementInput)
+setForwarderAddress(0x15fC6ae953E024d975e77382eEeC56A9101f9F88)  // restore
 ```
 
-Then call `onReport` with `metadata` = `0x` (empty) and `report` = ABI-encoded `SettlementInput`. This simulates what the KeystoneForwarder does in production.
+**4. View calls**
 
-After testing, restore with:
-```
-setForwarderAddress(0x15fC6ae953E024d975e77382eEeC56A9101f9F88)
-```
+| Contract | Function | Input | Expected |
+|---|---|---|---|
+| TObserver | `isOrderAnchored` | `"test-order-0001-ready-to-anchor"` | `true` |
+| TObserver | `getSettlementCount` | — | count |
+| TObserver | `getForwarderAddress` | — | current forwarder |
+| TObserverFunds | `getFundCount` | — | `1` |
+| TObserverFunds | `getFundById` | `"be6f2e8a-5474-43c7-a692-7918c37e3f42"` | full FundInfo |
 
-**6. View calls to verify state**
+> See `test/remix-inputs.md` for complete copy-paste tuples for all test calls.
 
-| Function | Input | Expected result |
-|---|---|---|
-| `isOrderAnchored` | `"test-order-0001-ready-to-anchor"` | `true` |
-| `isOrderAnchored` | `"test-order-0002-not-settled"` | `false` |
-| `getForwarderAddress` | — | current forwarder |
-| `getSettlementCount` | — | count of anchored settlements |
-| `getLatestSettlement` | `0xaabb...0001` | full SettlementRecord |
-| `getSettlement` | `0` | first record |
-| `getFundCount` | — | `1` |
-| `getFundById` | `"be6f2e8a-5474-43c7-a692-7918c37e3f42"` | full FundInfo |
-
-> All fake input values match `test/fixtures.json` — run `node test/mock-server.js` to serve these same values as Capitare API for CRE workflow testing.
+> The previously deployed address `0x84E0439Da40a543E45847841393d71A45A715537` is **stale** (v1.0.0, no `onReport`, no fund split). Redeploy both contracts and update `observerAddress` in `config.staging.json` and `OBSERVER_FUND_ADDRESS` in `frontend/.env`.
 
 ---
 
@@ -250,10 +264,6 @@ Run the CRE workflow against the mock:
 cre workflow simulate workflow-capitare --target test-settings --non-interactive --trigger-index 0
 ```
 
-For the frontend, set `CAPITARE_BASE_URL=http://localhost:3001` in `.env.local` so Vite proxies to the mock instead of the real API.
-
-For Remix contract testing, see `test/remix-inputs.md` — copy-paste values for `registerFund`, `reportSettlement`, and all view calls.
-
 ---
 
 ## Frontend
@@ -270,7 +280,8 @@ npm install
 Create `frontend/.env` (gitignored):
 
 ```
-OBSERVER_ADDRESS=0x84E0439Da40a543E45847841393d71A45A715537
+OBSERVER_ADDRESS=<deployed Observer.sol address>
+OBSERVER_FUND_ADDRESS=<deployed ObserverFund.sol address>
 ```
 
 Start the dev server:
@@ -280,14 +291,6 @@ npm run dev
 # http://localhost:5175
 ```
 
-The Vite dev server proxies `/capitare-api` → Capitare staging API automatically, so no CORS issues in dev.
-
-To test against the local mock server instead of the real API, set in `frontend/.env`:
-
-```
-CAPITARE_BASE=http://localhost:3001
-```
-
 ### Build for production
 
 ```bash
@@ -295,29 +298,12 @@ npm run build
 # output: frontend/dist/
 ```
 
-Preview the production build locally before publishing:
-
-```bash
-npm run preview
-```
-
 ### Publish (static hosting)
-
-The `dist/` folder is a standard SPA — deploy to any static host:
-
-**GitHub Pages:**
-```bash
-npm run build
-# push frontend/dist/ to the gh-pages branch, or use gh-pages package
-npx gh-pages -d dist
-```
 
 **Netlify / Vercel / Cloudflare Pages:**
 - Build command: `npm run build`
 - Output directory: `dist`
-- Set `OBSERVER_ADDRESS` as an environment variable in the hosting dashboard
-
-> Remember to set `OBSERVER_ADDRESS` as an env var in the hosting platform, not just in local `.env`.
+- Set `OBSERVER_ADDRESS` and `OBSERVER_FUND_ADDRESS` as environment variables
 
 ---
 
@@ -331,55 +317,36 @@ npm install
 npx hardhat compile
 ```
 
-Deploy to Sepolia (set private key in hardhat.config.js `accounts` array or via env):
-
-```bash
-npx hardhat run scripts/deploy.js --network sepolia
-```
-
-The deploy script passes the **simulation forwarder** (`0x15fC6ae953E024d975e77382eEeC56A9101f9F88`) to the constructor. Before going to production, call `setForwarderAddress(0xF8344CFd5c43616a4366C34E3EEE75af79a74482)` on the deployed contract.
+Deploy to Sepolia — deployment order:
+1. Deploy `ObserverFund(deployerAddress)`
+2. Deploy `Observer(forwarderAddress, observerFundAddress)`
 
 After deployment:
 1. Set `observerAddress` in `workflow-capitare/config/config.staging.json`
-2. _(Optional but recommended)_ Lock down to your specific workflow:
+2. Set `OBSERVER_ADDRESS` and `OBSERVER_FUND_ADDRESS` in `frontend/.env`
+3. _(Recommended)_ Lock down to your specific workflow after deploying to CRE:
    ```solidity
    observer.setExpectedWorkflowId(YOUR_WORKFLOW_ID)
    ```
 
 ### CRE workflow
 
-Copy the env template and fill in your values:
-
 ```bash
 cp .env.example .env
-# edit .env and set CRE_ETH_PRIVATE_KEY
-```
+# set CRE_ETH_PRIVATE_KEY in .env
 
-Install dependencies from the **project root**:
-
-```bash
 bun install --cwd ./workflow-capitare
 ```
 
-Set CRE secrets (stored in the DON, not locally):
+Set CRE secrets (stored in the DON):
 ```
 CAPITARE_OBSERVER_KEY=<from observer-api.env>
 ```
 
-> `CRE_TRANSACTION_PRIVATE_KEY` is no longer needed — the DON signs and submits transactions through the KeystoneForwarder internally.
-
-Simulate — CRON trigger (no payload needed):
+Simulate:
 ```bash
 cre workflow simulate workflow-capitare --target staging-settings --non-interactive --trigger-index 0
 ```
-
-Simulate — HTTP trigger (uses `payload.json`):
-```bash
-cre workflow simulate workflow-capitare --target staging-settings --non-interactive --trigger-index 1 --http-payload ./workflow-capitare/payload.json
-```
-
-> Simulation calls the **real Capitare API** and the **real Sepolia RPC** — no mocks.
-> Set `CAPITARE_OBSERVER_KEY` in `.env` and `observerAddress` in `config.staging.json` before running.
 
 Deploy (staging):
 ```bash
