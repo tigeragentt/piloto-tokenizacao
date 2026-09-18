@@ -1,35 +1,41 @@
 import {
   CronCapability,
-  ConsensusAggregationByFields,
+  EVMClient,
   HTTPCapability,
   HTTPClient,
+  LAST_FINALIZED_BLOCK_NUMBER,
   bytesToBase64,
+  bytesToHex,
   consensusIdenticalAggregation,
-  identical,
+  encodeCallMsg,
+  getNetwork,
   handler,
   json,
   ok,
+  prepareReportRequest,
+  TxStatus,
   type HTTPPayload,
   type HTTPSendRequester,
-  type NodeRuntime,
   type Runtime,
 } from "@chainlink/cre-sdk"
-import { encodeFunctionData, decodeFunctionResult } from "viem"
-import { privateKeyToAccount } from "viem/accounts"
-import { keccak256 } from "viem"
+import {
+  encodeAbiParameters,
+  encodeFunctionData,
+  decodeFunctionResult,
+  zeroAddress,
+} from "viem"
 
 export type Config = {
   capitareBaseUrl: string   // e.g. "https://dev-api-mercado-bitcoin.web3up.mobi/v1/external/observer"
   capitareClientId: string  // X-Observer-Id header value, e.g. "mb-observer-demo"
   fundId: string            // Capitare fund UUID
   schedule: string          // cron expression, e.g. "0 */2 * * * *"
-  sepoliaRpcUrl: string
-  sepoliaChainId: number
+  chainSelectorName: string // CRE chain selector name, e.g. "ethereum-testnet-sepolia"
   observerAddress: string   // Observer.sol on Sepolia; "" = disabled
   maxOrdersPerRun: number   // max ACQUIRED_WITH_LOCK orders to anchor per execution; 1 for simulation (15 HTTP call limit)
 }
 
-// ─── Observer.sol ABI ────────────────────────────────────────────────────────
+// ─── Observer.sol ABI (read-only) ────────────────────────────────────────────
 
 const OBSERVER_ABI = [
   {
@@ -38,36 +44,6 @@ const OBSERVER_ABI = [
     inputs: [{ name: "orderId", type: "string" }],
     outputs: [{ name: "", type: "bool" }],
     stateMutability: "view",
-  },
-  {
-    name: "isSettlementAnchored",
-    type: "function",
-    inputs: [{ name: "intentHash", type: "bytes32" }],
-    outputs: [{ name: "", type: "bool" }],
-    stateMutability: "view",
-  },
-  {
-    name: "reportSettlement",
-    type: "function",
-    inputs: [
-      {
-        name: "s",
-        type: "tuple",
-        components: [
-          { name: "orderId",             type: "string"  },
-          { name: "intentHash",          type: "bytes32" },
-          { name: "progress",            type: "string"  },
-          { name: "technicalCompleted",  type: "bool"    },
-          { name: "accountingCompleted", type: "bool"    },
-          { name: "deliveryProofSHA256", type: "bytes32" },
-          { name: "resolutionHash",      type: "bytes32" },
-          { name: "sourceNetwork",       type: "string"  },
-          { name: "destinationNetwork",  type: "string"  },
-        ],
-      },
-    ],
-    outputs: [{ name: "recordId", type: "uint256" }],
-    stateMutability: "nonpayable",
   },
 ] as const
 
@@ -118,37 +94,6 @@ const toBytes32 = (hex: string): `0x${string}` => {
 
 const ZERO_BYTES32: `0x${string}` = "0x0000000000000000000000000000000000000000000000000000000000000000"
 
-// ─── RPC helpers ─────────────────────────────────────────────────────────────
-
-const rpcCall = (
-  runtime: Runtime<Config>,
-  httpClient: HTTPClient,
-  rpcUrl: string,
-  method: string,
-  params: unknown[],
-  id: number,
-): string => {
-  const bodyBytes = bytesToBase64(
-    new TextEncoder().encode(JSON.stringify({ jsonrpc: "2.0", method, params, id }))
-  )
-  return httpClient.sendRequest(
-    runtime,
-    (sendRequester: HTTPSendRequester) => {
-      const r = sendRequester.sendRequest({
-        url: rpcUrl,
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: bodyBytes,
-      }).result()
-      if (!ok(r)) throw new Error(`${method} HTTP ${r.statusCode}`)
-      const resp = json(r) as { result: unknown; error?: { message: string } }
-      if (resp.error) throw new Error(`RPC: ${resp.error.message}`)
-      return JSON.stringify(resp.result)
-    },
-    consensusIdenticalAggregation<string>()
-  )().result()
-}
-
 // ─── Capitare API helpers ─────────────────────────────────────────────────────
 
 const capitareGet = (
@@ -182,80 +127,68 @@ const capitareGet = (
   return JSON.parse(raw) as CapitareResult
 }
 
-// ─── Node-mode: submit signed tx ─────────────────────────────────────────────
-
-const submitTx = (
-  nodeRuntime: NodeRuntime<Config>,
-  signedTx: string,
-): { status: string } => {
-  const httpClient = new HTTPClient()
-  const { sepoliaRpcUrl } = nodeRuntime.config
-  const body = JSON.stringify({ jsonrpc: "2.0", method: "eth_sendRawTransaction", params: [signedTx], id: 1 })
-  const response = httpClient.sendRequest(nodeRuntime, {
-    url: sepoliaRpcUrl,
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: bytesToBase64(new TextEncoder().encode(body)),
-    cacheSettings: { store: false },
-  }).result()
-  if (!ok(response)) throw new Error(`HTTP ${response.statusCode}`)
-  const result = json(response) as { result?: string; error?: { message: string } }
-  if (result.error) {
-    const msg = result.error.message.toLowerCase()
-    if (msg.includes("already known") || msg.includes("nonce too low") || msg.includes("replacement")) {
-      return { status: "already_known" }
-    }
-    throw new Error(`RPC: ${result.error.message}`)
-  }
-  return { status: "submitted" }
-}
-
 // ─── Observer check ───────────────────────────────────────────────────────────
 
 const isAlreadyAnchored = (
   runtime: Runtime<Config>,
-  httpClient: HTTPClient,
+  evmClient: EVMClient,
   orderId: string,
 ): boolean => {
-  const { sepoliaRpcUrl, observerAddress } = runtime.config
+  const { observerAddress } = runtime.config
   const callData = encodeFunctionData({
     abi: OBSERVER_ABI,
     functionName: "isOrderAnchored",
     args: [orderId],
   })
-  const raw = JSON.parse(
-    rpcCall(runtime, httpClient, sepoliaRpcUrl, "eth_call", [{ to: observerAddress, data: callData }, "latest"], 50)
-  ) as string
+  const result = evmClient.callContract(runtime, {
+    call: encodeCallMsg({
+      from: zeroAddress,
+      to: observerAddress as `0x${string}`,
+      data: callData,
+    }),
+    blockNumber: LAST_FINALIZED_BLOCK_NUMBER,
+  }).result()
   return decodeFunctionResult({
     abi: OBSERVER_ABI,
     functionName: "isOrderAnchored",
-    data: raw as `0x${string}`,
+    data: bytesToHex(result.data),
   }) as boolean
 }
 
 // ─── Anchor settlement ────────────────────────────────────────────────────────
 
-const anchorSettlement = async (
+const anchorSettlement = (
   runtime: Runtime<Config>,
-  httpClient: HTTPClient,
+  evmClient: EVMClient,
   order: Order,
   settlement: SettlementResponse,
-): Promise<void> => {
-  const { sepoliaRpcUrl, sepoliaChainId, observerAddress } = runtime.config
-  const rawKey = runtime.getSecret({ id: "cre_transaction_private_key" }).result().value as string
-  const privateKey = (rawKey.startsWith("0x") ? rawKey : `0x${rawKey}`) as `0x${string}`
-  const account = privateKeyToAccount(privateKey)
-
+): void => {
+  const { observerAddress } = runtime.config
   const intentHashBytes32 = toBytes32(order.intentHash)
   const deliveryBytes32 = settlement.resolution?.deliveryProofSHA256
     ? toBytes32(settlement.resolution.deliveryProofSHA256)
     : ZERO_BYTES32
   const resolutionBytes32 = toBytes32(settlement.resolutionHash)
 
-  const data = encodeFunctionData({
-    abi: OBSERVER_ABI,
-    functionName: "reportSettlement",
-    args: [
+  // ABI-encode SettlementInput struct — must match what Observer.sol's onReport decodes
+  const encoded = encodeAbiParameters(
+    [
+      {
+        type: "tuple",
+        components: [
+          { name: "orderId",             type: "string"  },
+          { name: "intentHash",          type: "bytes32" },
+          { name: "progress",            type: "string"  },
+          { name: "technicalCompleted",  type: "bool"    },
+          { name: "accountingCompleted", type: "bool"    },
+          { name: "deliveryProofSHA256", type: "bytes32" },
+          { name: "resolutionHash",      type: "bytes32" },
+          { name: "sourceNetwork",       type: "string"  },
+          { name: "destinationNetwork",  type: "string"  },
+        ],
+      },
+    ] as const,
+    [
       {
         orderId:             order.id,
         intentHash:          intentHashBytes32,
@@ -267,40 +200,39 @@ const anchorSettlement = async (
         sourceNetwork:       order.intent.sourceNetwork,
         destinationNetwork:  order.intent.destinationNetwork,
       },
-    ],
-  })
+    ]
+  )
 
-  const nonceHex = JSON.parse(rpcCall(runtime, httpClient, sepoliaRpcUrl, "eth_getTransactionCount", [account.address, "pending"], 60))
-  const gasPriceHex = JSON.parse(rpcCall(runtime, httpClient, sepoliaRpcUrl, "eth_gasPrice", [], 61))
+  const signedReport = runtime.report(prepareReportRequest(encoded)).result()
 
-  const signedTx = await account.signTransaction({
-    to: observerAddress as `0x${string}`,
-    data,
-    nonce: parseInt(nonceHex as string, 16),
-    gasPrice: BigInt(gasPriceHex as string),
-    gas: 300000n,
-    chainId: sepoliaChainId,
-    type: "legacy",
-  })
+  const txResult = evmClient.writeReport(runtime, {
+    receiver: observerAddress,
+    report: signedReport,
+    gasConfig: { gasLimit: "500000" },
+  }).result()
 
-  const txHash = keccak256(signedTx)
-  runtime.log(`anchorSettlement orderId=${order.id} intentHash=0x${order.intentHash} txHash=${txHash}`)
+  if (txResult.txStatus !== TxStatus.SUCCESS) {
+    throw new Error(`writeReport failed: ${txResult.errorMessage ?? txResult.txStatus}`)
+  }
 
-  runtime.runInNodeMode(
-    submitTx,
-    ConsensusAggregationByFields<{ status: string }>({ status: identical })
-  )(signedTx).result()
+  const txHash = bytesToHex(txResult.txHash ?? new Uint8Array(32))
+  runtime.log(`anchorSettlement orderId=${order.id} txHash=${txHash}`)
 }
 
 // ─── Main scan ────────────────────────────────────────────────────────────────
 
 const scanAndAnchor = async (runtime: Runtime<Config>): Promise<ScanResult> => {
-  const { observerAddress, fundId, maxOrdersPerRun } = runtime.config
+  const { observerAddress, fundId, maxOrdersPerRun, chainSelectorName } = runtime.config
   const result: ScanResult = { ordersChecked: 0, anchored: 0, skipped: 0, errors: [] }
   let processed = 0
 
-  const observerKey = runtime.getSecret({ id: "capitare_observer_key" }).result().value as string
   const httpClient = new HTTPClient()
+
+  const network = getNetwork({ chainFamily: "evm", chainSelectorName })
+  if (!network) throw new Error(`Unknown chainSelectorName: ${chainSelectorName}`)
+  const evmClient = new EVMClient(network.chainSelector.selector)
+
+  const observerKey = runtime.getSecret({ id: "capitare_observer_key" }).result().value as string
 
   runtime.log(`Fetching orders for fund ${fundId}`)
   const ordersData = capitareGet(runtime, httpClient, `/funds/${fundId}/debenture-orders`, observerKey)
@@ -329,9 +261,7 @@ const scanAndAnchor = async (runtime: Runtime<Config>): Promise<ScanResult> => {
     }
 
     try {
-      const intentHashBytes32 = toBytes32(order.intentHash)
-
-      if (observerAddress && isAlreadyAnchored(runtime, httpClient, order.id)) {
+      if (observerAddress && isAlreadyAnchored(runtime, evmClient, order.id)) {
         runtime.log(`Order ${order.id}: already anchored — skip`)
         result.skipped++
         continue
@@ -362,7 +292,7 @@ const scanAndAnchor = async (runtime: Runtime<Config>): Promise<ScanResult> => {
         continue
       }
 
-      await anchorSettlement(runtime, httpClient, order, settlement)
+      anchorSettlement(runtime, evmClient, order, settlement)
       result.anchored++
       processed++
     } catch (err) {

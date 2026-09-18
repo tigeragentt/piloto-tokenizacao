@@ -3,8 +3,7 @@
   "capitareClientId": "mock-client",
   "fundId": "be6f2e8a-5474-43c7-a692-7918c37e3f42",
   "schedule": "0 */2 * * * *",
-  "sepoliaRpcUrl": "https://ethereum-sepolia-rpc.publicnode.com",
-  "sepoliaChainId": 11155111,
+  "chainSelectorName": "ethereum-testnet-sepolia",
   "observerAddress": "0x84E0439Da40a543E45847841393d71A45A715537",
   "maxOrdersPerRun": 1
 }

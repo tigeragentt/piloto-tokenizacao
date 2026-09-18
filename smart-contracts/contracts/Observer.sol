@@ -26,9 +26,17 @@ contract Observer is AccessControl {
     error InvalidRange();
     error OutOfBounds();
 
-    string public constant VERSION = "1.0.0";
+    string public constant VERSION = "1.1.0";
 
     bytes32 public constant REPORTER_ROLE = keccak256("REPORTER_ROLE");
+
+    // CRE KeystoneForwarder address — calls onReport() with DON-signed reports.
+    // Default: Sepolia simulation forwarder. Update via setForwarder() before production.
+    //
+    // Known forwarder addresses:
+    //   Ethereum Sepolia simulation : 0x15fC6ae953E024d975e77382eEeC56A9101f9F88
+    //   Ethereum Sepolia production : 0xF8344CFd5c43616a4366C34E3EEE75af79a74482
+    address public forwarder;
 
     // ─── Fund Registry ──────────────────────────────────────────────────────
 
@@ -129,6 +137,8 @@ contract Observer is AccessControl {
 
     // ─── Events ─────────────────────────────────────────────────────────────
 
+    event ForwarderUpdated(address indexed forwarder);
+
     event FundRegistered(
         uint256 indexed fundIdx,
         string  indexed fundId,
@@ -162,10 +172,17 @@ contract Observer is AccessControl {
 
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        // REPORTER_ROLE must be granted explicitly to the CRE wallet after deployment
+        // REPORTER_ROLE must be granted explicitly for direct reportSettlement() calls
+        // Default forwarder: Sepolia simulation. Update via setForwarder() before production.
+        forwarder = 0x15fC6ae953E024d975e77382eEeC56A9101f9F88;
     }
 
     // ─── Admin ──────────────────────────────────────────────────────────────
+
+    function setForwarder(address _forwarder) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        forwarder = _forwarder;
+        emit ForwarderUpdated(_forwarder);
+    }
 
     function registerFund(
         FundInput calldata f
@@ -224,6 +241,23 @@ contract Observer is AccessControl {
     function reportSettlement(
         SettlementInput calldata s
     ) external onlyRole(REPORTER_ROLE) returns (uint256 recordId) {
+        return _reportSettlement(s);
+    }
+
+    /**
+     * @notice Called by the CRE KeystoneForwarder with an ABI-encoded SettlementInput.
+     *         This is the primary write path for the CRE workflow.
+     *         Expected report layout: abi.encode(SettlementInput)
+     */
+    function onReport(bytes calldata /* metadata */, bytes calldata report) external {
+        require(msg.sender == forwarder, "Observer: only forwarder");
+        SettlementInput memory s = abi.decode(report, (SettlementInput));
+        _reportSettlement(s);
+    }
+
+    function _reportSettlement(
+        SettlementInput memory s
+    ) internal returns (uint256 recordId) {
         if (_orderAnchored[s.orderId]) revert OrderAlreadyAnchored();
         _orderAnchored[s.orderId] = true;
         recordId = _settlements.length;

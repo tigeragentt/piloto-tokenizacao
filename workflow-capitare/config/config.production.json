@@ -3,8 +3,7 @@
   "capitareClientId": "TODO_PRODUCTION_CLIENT_ID",
   "fundId": "TODO_PRODUCTION_FUND_ID",
   "schedule": "0 */5 * * * *",
-  "sepoliaRpcUrl": "https://ethereum-sepolia-rpc.publicnode.com",
-  "sepoliaChainId": 11155111,
+  "chainSelectorName": "ethereum-testnet-sepolia",
   "observerAddress": "",
   "maxOrdersPerRun": 5
 }
