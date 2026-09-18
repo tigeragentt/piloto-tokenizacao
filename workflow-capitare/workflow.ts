@@ -152,12 +152,12 @@ const capitareGet = (
   httpClient: HTTPClient,
   path: string,
   observerKey: string,
-): unknown | null => {
+): object | null => {
   const { capitareBaseUrl, capitareClientId } = runtime.config
   const url = `${capitareBaseUrl}${path}`
   return httpClient.sendRequest(
     runtime,
-    (sendRequester: HTTPSendRequester) => {
+    (sendRequester: HTTPSendRequester): object | null => {
       const r = sendRequester.sendRequest({
         url,
         method: "GET",
@@ -170,9 +170,9 @@ const capitareGet = (
       }).result()
       if (r.statusCode === 404) return null
       if (!ok(r)) throw new Error(`Capitare GET ${path} → HTTP ${r.statusCode}`)
-      return json(r)
+      return json(r) as object
     },
-    consensusIdenticalAggregation<unknown | null>()
+    consensusIdenticalAggregation<object | null>()
   )().result()
 }
 
