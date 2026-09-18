@@ -31,7 +31,7 @@ contract TObserver is ReceiverTemplate {
 
     // ─── Constants ───────────────────────────────────────────────────────────
 
-    string public constant VERSION = "1.6.0";
+    string public constant VERSION = "1.2.0";
 
     // Sepolia simulation forwarder — default for Remix.
     // Call setForwarderAddress() to switch to production forwarder.
