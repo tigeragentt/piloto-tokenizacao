@@ -51,7 +51,7 @@ export default function App() {
           </Routes>
         </main>
         <footer className="app-footer">
-          <span>Horizonte Crédito Multirrede FIDC — Piloto XDC &middot; ABToken &middot; CVM Supervisability Layer</span>
+          <span>Piloto ABToken &middot; CVM</span>
         </footer>
       </div>
     </WalletProvider>
