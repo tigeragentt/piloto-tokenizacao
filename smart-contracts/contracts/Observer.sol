@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.36;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {IReceiver} from "./interfaces/IReceiver.sol";
 
 /**
  * @title Observer
@@ -17,7 +18,9 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
  *
  * @custom:security-contact sol@abtoken.xyz
  */
-contract Observer is AccessControl {
+contract Observer is AccessControl, IReceiver {
+
+    // ─── Errors ─────────────────────────────────────────────────────────────
 
     error FundAlreadyRegistered();
     error ActionAlreadyAnchored();
@@ -26,19 +29,41 @@ contract Observer is AccessControl {
     error InvalidRange();
     error OutOfBounds();
 
-    string public constant VERSION = "1.1.0";
+    // Receiver errors (matching ReceiverTemplate pattern)
+    error InvalidForwarderAddress();
+    error InvalidSender(address sender, address expected);
+    error InvalidAuthor(address received, address expected);
+    error InvalidWorkflowName(bytes10 received, bytes10 expected);
+    error InvalidWorkflowId(bytes32 received, bytes32 expected);
+    error WorkflowNameRequiresAuthorValidation();
+
+    // ─── Constants ───────────────────────────────────────────────────────────
+
+    string public constant VERSION = "1.2.0";
 
     bytes32 public constant REPORTER_ROLE = keccak256("REPORTER_ROLE");
 
-    // CRE KeystoneForwarder address — calls onReport() with DON-signed reports.
-    // Default: Sepolia simulation forwarder. Update via setForwarder() before production.
-    //
-    // Known forwarder addresses:
+    bytes private constant HEX_CHARS = "0123456789abcdef";
+
+    // ─── Receiver Security State ─────────────────────────────────────────────
+
+    // Required: address of the Chainlink KeystoneForwarder that calls onReport().
+    // Known addresses:
     //   Ethereum Sepolia simulation : 0x15fC6ae953E024d975e77382eEeC56A9101f9F88
     //   Ethereum Sepolia production : 0xF8344CFd5c43616a4366C34E3EEE75af79a74482
-    address public forwarder;
+    address private s_forwarderAddress;
 
-    // ─── Fund Registry ──────────────────────────────────────────────────────
+    // Optional: restrict to a specific CRE workflow owner address.
+    address private s_expectedAuthor;
+
+    // Optional: restrict to a specific workflow name (bytes10 SHA256 truncation).
+    //           REQUIRES s_expectedAuthor to be set — name alone is not collision-safe.
+    bytes10 private s_expectedWorkflowName;
+
+    // Optional: restrict to a specific workflow ID.
+    bytes32 private s_expectedWorkflowId;
+
+    // ─── Fund Registry ───────────────────────────────────────────────────────
 
     struct FundInput {
         string  fundId;
@@ -67,7 +92,7 @@ contract Observer is AccessControl {
     FundInfo[]                     private _funds;
     mapping(string => uint256)     private _fundIdToIndex;   // 1-based; 0 = not registered
 
-    // ─── General Action Log ─────────────────────────────────────────────────
+    // ─── General Action Log ──────────────────────────────────────────────────
 
     enum ActionType {
         Transfer,              // 0  BRL-CVM ERC-20 transfer on XDC
@@ -101,7 +126,7 @@ contract Observer is AccessControl {
     ActionRecord[] private _actions;
     mapping(bytes32 => bool)       private _txAnchored;      // keccak256(network ++ txHash) → seen
 
-    // ─── Settlement Records ─────────────────────────────────────────────────
+    // ─── Settlement Records ──────────────────────────────────────────────────
 
     struct SettlementInput {
         string   orderId;
@@ -135,10 +160,16 @@ contract Observer is AccessControl {
     // intentHash → 1-based index into _settlements (workflow lookup key)
     mapping(bytes32 => uint256) public latestSettlementId;
 
-    // ─── Events ─────────────────────────────────────────────────────────────
+    // ─── Events ──────────────────────────────────────────────────────────────
 
-    event ForwarderUpdated(address indexed forwarder);
+    // Receiver events
+    event ForwarderAddressUpdated(address indexed previousForwarder, address indexed newForwarder);
+    event ExpectedAuthorUpdated(address indexed previousAuthor, address indexed newAuthor);
+    event ExpectedWorkflowNameUpdated(bytes10 indexed previousName, bytes10 indexed newName);
+    event ExpectedWorkflowIdUpdated(bytes32 indexed previousId, bytes32 indexed newId);
+    event SecurityWarning(string message);
 
+    // Domain events
     event FundRegistered(
         uint256 indexed fundIdx,
         string  indexed fundId,
@@ -168,25 +199,79 @@ contract Observer is AccessControl {
         uint256         reportedAt
     );
 
-    // ─── Constructor ────────────────────────────────────────────────────────
+    // ─── Constructor ─────────────────────────────────────────────────────────
 
-    constructor() {
+    /// @param _forwarderAddress CRE KeystoneForwarder address. Cannot be address(0).
+    constructor(address _forwarderAddress) {
+        if (_forwarderAddress == address(0)) revert InvalidForwarderAddress();
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        // REPORTER_ROLE must be granted explicitly for direct reportSettlement() calls
-        // Default forwarder: Sepolia simulation. Update via setForwarder() before production.
-        forwarder = 0x15fC6ae953E024d975e77382eEeC56A9101f9F88;
+        s_forwarderAddress = _forwarderAddress;
+        emit ForwarderAddressUpdated(address(0), _forwarderAddress);
     }
 
-    // ─── Admin ──────────────────────────────────────────────────────────────
+    // ─── Receiver Security — Getters ─────────────────────────────────────────
 
-    function setForwarder(address _forwarder) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        forwarder = _forwarder;
-        emit ForwarderUpdated(_forwarder);
+    function getForwarderAddress() external view returns (address) {
+        return s_forwarderAddress;
     }
 
-    function registerFund(
-        FundInput calldata f
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function getExpectedAuthor() external view returns (address) {
+        return s_expectedAuthor;
+    }
+
+    function getExpectedWorkflowName() external view returns (bytes10) {
+        return s_expectedWorkflowName;
+    }
+
+    function getExpectedWorkflowId() external view returns (bytes32) {
+        return s_expectedWorkflowId;
+    }
+
+    // ─── Receiver Security — Setters ─────────────────────────────────────────
+
+    /// @notice Update the KeystoneForwarder address.
+    /// @dev Setting to address(0) disables forwarder validation — contract becomes INSECURE.
+    function setForwarderAddress(address _forwarder) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        address prev = s_forwarderAddress;
+        if (_forwarder == address(0)) {
+            emit SecurityWarning("Forwarder address set to zero - contract is now INSECURE");
+        }
+        s_forwarderAddress = _forwarder;
+        emit ForwarderAddressUpdated(prev, _forwarder);
+    }
+
+    function setExpectedAuthor(address _author) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        address prev = s_expectedAuthor;
+        s_expectedAuthor = _author;
+        emit ExpectedAuthorUpdated(prev, _author);
+    }
+
+    /// @notice Restrict onReport to a specific workflow name.
+    /// @dev REQUIRES setExpectedAuthor() to also be configured.
+    function setExpectedWorkflowName(string calldata _name) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        bytes10 prev = s_expectedWorkflowName;
+        if (bytes(_name).length == 0) {
+            s_expectedWorkflowName = bytes10(0);
+            emit ExpectedWorkflowNameUpdated(prev, bytes10(0));
+            return;
+        }
+        bytes32 hash = sha256(bytes(_name));
+        bytes memory hexStr = _bytesToHexString(abi.encodePacked(hash));
+        bytes memory first10 = new bytes(10);
+        for (uint256 i = 0; i < 10; i++) first10[i] = hexStr[i];
+        s_expectedWorkflowName = bytes10(first10);
+        emit ExpectedWorkflowNameUpdated(prev, s_expectedWorkflowName);
+    }
+
+    function setExpectedWorkflowId(bytes32 _id) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        bytes32 prev = s_expectedWorkflowId;
+        s_expectedWorkflowId = _id;
+        emit ExpectedWorkflowIdUpdated(prev, _id);
+    }
+
+    // ─── Admin ────────────────────────────────────────────────────────────────
+
+    function registerFund(FundInput calldata f) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (_fundIdToIndex[f.fundId] != 0) revert FundAlreadyRegistered();
         _funds.push(FundInfo({
             fundId: f.fundId, name: f.name,
@@ -199,17 +284,41 @@ contract Observer is AccessControl {
         emit FundRegistered(_funds.length - 1, f.fundId, f.name);
     }
 
-    // ─── Reporter ───────────────────────────────────────────────────────────
+    // ─── IReceiver Implementation ─────────────────────────────────────────────
 
-    /**
-     * @notice Log a general on-chain action observed on XDC (or another network).
-     * @param network  Origin chain identifier, e.g. "eip155:51".
-     * @param action   ActionType enum value.
-     * @param from     Sender address in string form (cross-chain compatible).
-     * @param to       Receiver address.
-     * @param amount   Raw token amount on the origin chain.
-     * @param txHash   Transaction hash on the origin network.
-     */
+    /// @inheritdoc IReceiver
+    function onReport(bytes calldata metadata, bytes calldata report) external override {
+        // Check 1: caller must be the trusted forwarder (if set)
+        if (s_forwarderAddress != address(0) && msg.sender != s_forwarderAddress) {
+            revert InvalidSender(msg.sender, s_forwarderAddress);
+        }
+
+        // Checks 2-4: optional workflow identity (workflowId, owner, name)
+        if (s_expectedWorkflowId != bytes32(0) || s_expectedAuthor != address(0) || s_expectedWorkflowName != bytes10(0)) {
+            (bytes32 workflowId, bytes10 workflowName, address workflowOwner) = _decodeMetadata(metadata);
+
+            if (s_expectedWorkflowId != bytes32(0) && workflowId != s_expectedWorkflowId) {
+                revert InvalidWorkflowId(workflowId, s_expectedWorkflowId);
+            }
+            if (s_expectedAuthor != address(0) && workflowOwner != s_expectedAuthor) {
+                revert InvalidAuthor(workflowOwner, s_expectedAuthor);
+            }
+            if (s_expectedWorkflowName != bytes10(0)) {
+                if (s_expectedAuthor == address(0)) revert WorkflowNameRequiresAuthorValidation();
+                if (workflowName != s_expectedWorkflowName) revert InvalidWorkflowName(workflowName, s_expectedWorkflowName);
+            }
+        }
+
+        _processReport(report);
+    }
+
+    /// @notice Direct settlement anchoring for REPORTER_ROLE (bypass CRE path).
+    function reportSettlement(SettlementInput calldata s) external onlyRole(REPORTER_ROLE) returns (uint256 recordId) {
+        return _reportSettlement(s);
+    }
+
+    // ─── Reporter ─────────────────────────────────────────────────────────────
+
     function reportAction(
         string     calldata network,
         ActionType          action,
@@ -231,33 +340,14 @@ contract Observer is AccessControl {
         emit ActionReported(recordId, network, txHash, action, from, to, amount, block.timestamp);
     }
 
-    /**
-     * @notice Anchor a Capitare FIDC settlement proof on-chain. Each orderId may only
-     *         be anchored once. latestSettlementId[intentHash] provides a bytes32 lookup
-     *         for the CRE workflow.
-     *
-     * @param s  SettlementInput struct — packs all nine fields to avoid stack-too-deep.
-     */
-    function reportSettlement(
-        SettlementInput calldata s
-    ) external onlyRole(REPORTER_ROLE) returns (uint256 recordId) {
-        return _reportSettlement(s);
-    }
+    // ─── Internal ─────────────────────────────────────────────────────────────
 
-    /**
-     * @notice Called by the CRE KeystoneForwarder with an ABI-encoded SettlementInput.
-     *         This is the primary write path for the CRE workflow.
-     *         Expected report layout: abi.encode(SettlementInput)
-     */
-    function onReport(bytes calldata /* metadata */, bytes calldata report) external {
-        require(msg.sender == forwarder, "Observer: only forwarder");
+    function _processReport(bytes calldata report) internal {
         SettlementInput memory s = abi.decode(report, (SettlementInput));
         _reportSettlement(s);
     }
 
-    function _reportSettlement(
-        SettlementInput memory s
-    ) internal returns (uint256 recordId) {
+    function _reportSettlement(SettlementInput memory s) internal returns (uint256 recordId) {
         if (_orderAnchored[s.orderId]) revert OrderAlreadyAnchored();
         _orderAnchored[s.orderId] = true;
         recordId = _settlements.length;
@@ -282,7 +372,34 @@ contract Observer is AccessControl {
         );
     }
 
-    // ─── Existence Checks ───────────────────────────────────────────────────
+    /// @notice Decode Forwarder metadata: abi.encodePacked(workflowId, workflowName, workflowOwner)
+    function _decodeMetadata(bytes memory metadata)
+        internal pure
+        returns (bytes32 workflowId, bytes10 workflowName, address workflowOwner)
+    {
+        assembly {
+            workflowId    := mload(add(metadata, 32))
+            workflowName  := mload(add(metadata, 64))
+            workflowOwner := shr(mul(12, 8), mload(add(metadata, 74)))
+        }
+    }
+
+    function _bytesToHexString(bytes memory data) private pure returns (bytes memory) {
+        bytes memory hexStr = new bytes(data.length * 2);
+        for (uint256 i = 0; i < data.length; i++) {
+            hexStr[i * 2]     = HEX_CHARS[uint8(data[i] >> 4)];
+            hexStr[i * 2 + 1] = HEX_CHARS[uint8(data[i] & 0x0f)];
+        }
+        return hexStr;
+    }
+
+    // ─── ERC165 ───────────────────────────────────────────────────────────────
+
+    function supportsInterface(bytes4 interfaceId) public view virtual override(AccessControl, IERC165) returns (bool) {
+        return interfaceId == type(IReceiver).interfaceId || super.supportsInterface(interfaceId);
+    }
+
+    // ─── Existence Checks ─────────────────────────────────────────────────────
 
     function isFundRegistered(string calldata fundId) external view returns (bool) {
         return _fundIdToIndex[fundId] != 0;
@@ -296,12 +413,11 @@ contract Observer is AccessControl {
         return _orderAnchored[orderId];
     }
 
-    // intentHash-based check kept for CRE workflow backward compatibility
     function isSettlementAnchored(bytes32 intentHash) external view returns (bool) {
         return latestSettlementId[intentHash] != 0;
     }
 
-    // ─── Settlement Views ───────────────────────────────────────────────────
+    // ─── Settlement Views ─────────────────────────────────────────────────────
 
     function getLatestSettlement(bytes32 intentHash) external view returns (SettlementRecord memory) {
         uint256 id = latestSettlementId[intentHash];
@@ -333,7 +449,7 @@ contract Observer is AccessControl {
         for (uint256 i = 0; i < n; i++) result[i] = _settlements[fromIndex + i];
     }
 
-    // ─── Action Views ────────────────────────────────────────────────────────
+    // ─── Action Views ─────────────────────────────────────────────────────────
 
     function getActionCount() external view returns (uint256) {
         return _actions.length;
@@ -359,7 +475,7 @@ contract Observer is AccessControl {
         for (uint256 i = 0; i < n; i++) result[i] = _actions[fromIndex + i];
     }
 
-    // ─── Fund Views ──────────────────────────────────────────────────────────
+    // ─── Fund Views ───────────────────────────────────────────────────────────
 
     function getFundCount() external view returns (uint256) {
         return _funds.length;
