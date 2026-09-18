@@ -1,8 +1,13 @@
 import { defineConfig, loadEnv } from 'vite'
+import { resolve } from 'path'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '')
+  // Merge: root .env (base) + frontend/.env (overrides)
+  // This lets OBSERVER_ADDRESS live in the project root .env alongside CRE vars
+  const rootEnv = loadEnv(mode, resolve(process.cwd(), '..'), '')
+  const localEnv = loadEnv(mode, process.cwd(), '')
+  const env = { ...rootEnv, ...localEnv }
   const capitareBase = env.CAPITARE_BASE || 'https://dev-api-mercado-bitcoin.web3up.mobi'
 
   return {
