@@ -31,6 +31,7 @@ escrow proxy (per-order, EIP-1167)
 **Observer.sol** (Ethereum Sepolia) is the immutable supervisability layer:
 - Chainlink CRE workflows anchor settlement proofs from the Capitare API
 - CVM can independently verify `deliveryProofSHA256` and `resolutionHash` without trusting any intermediary
+- Implements `IReceiver` (ReceiverTemplate pattern) — the Chainlink KeystoneForwarder calls `onReport()` with DON-signed reports
 
 ## Repository structure
 
@@ -111,6 +112,53 @@ cre workflow simulate workflow-capitare --target test-settings --non-interactive
 
 ---
 
+## Observer.sol — CRE Receiver pattern (v1.2.0)
+
+Observer.sol follows the [ReceiverTemplate](https://github.com/tigeragentt/cre-world-cup-prediction-market/blob/main/contracts/interfaces/ReceiverTemplate.sol) pattern for receiving DON-signed reports from the Chainlink KeystoneForwarder.
+
+### Interface
+
+```solidity
+interface IReceiver is IERC165 {
+    function onReport(bytes calldata metadata, bytes calldata report) external;
+}
+```
+
+Observer implements `IReceiver` and returns `true` for `supportsInterface(type(IReceiver).interfaceId)`.
+
+### Constructor
+
+The forwarder address is **required at deploy time** — `address(0)` reverts:
+
+```solidity
+constructor(address _forwarderAddress)
+```
+
+| Network | Forwarder address |
+|---|---|
+| Ethereum Sepolia — simulation | `0x15fC6ae953E024d975e77382eEeC56A9101f9F88` |
+| Ethereum Sepolia — production | `0xF8344CFd5c43616a4366C34E3EEE75af79a74482` |
+
+### Security setters (DEFAULT_ADMIN_ROLE)
+
+| Function | Purpose |
+|---|---|
+| `setForwarderAddress(address)` | Update the trusted forwarder. Setting `address(0)` disables the check (insecure) |
+| `setExpectedAuthor(address)` | Restrict `onReport` to a specific CRE workflow owner |
+| `setExpectedWorkflowName(string)` | Restrict by workflow name (requires `setExpectedAuthor` to also be set) |
+| `setExpectedWorkflowId(bytes32)` | Restrict to an exact workflow ID — strongest lock-down |
+
+After deploying and registering the workflow in CRE, call `setExpectedWorkflowId(workflowId)` to ensure only your specific workflow can write to this contract.
+
+### Write paths
+
+| Caller | Function | When to use |
+|---|---|---|
+| Chainlink KeystoneForwarder | `onReport(bytes metadata, bytes report)` | Normal CRE workflow execution |
+| Admin wallet (REPORTER_ROLE) | `reportSettlement(SettlementInput)` | Manual anchoring / recovery |
+
+---
+
 ## Testing with ObserverTest.sol
 
 `ObserverTest.sol` is the Remix-ready version of Observer for development testing.
@@ -118,13 +166,15 @@ cre workflow simulate workflow-capitare --target test-settings --non-interactive
 | | Observer.sol | ObserverTest.sol |
 |---|---|---|
 | Deploy via | Hardhat | Remix IDE |
-| REPORTER_ROLE | Must be granted manually after deploy | Auto-granted to `msg.sender` in constructor |
-| Deployed on Sepolia | see config | `0x84E0439Da40a543E45847841393d71A45A715537` |
+| Constructor | requires `_forwarderAddress` param | no-arg; defaults to simulation forwarder |
+| REPORTER_ROLE | must be granted manually | auto-granted to `msg.sender` in constructor |
 | Purpose | Production / CRE workflow | Manual testing in Remix |
+
+> The previously deployed address `0x84E0439Da40a543E45847841393d71A45A715537` is **stale** (v1.0.0, no `onReport`). Redeploy from `smart-contracts/remix/ObserverTest.sol` (Remix) or `smart-contracts/contracts/Observer.sol` (Hardhat) and update `observerAddress` in `config.staging.json`.
 
 ### Test sequence in Remix
 
-Connect MetaMask to Sepolia, load `smart-contracts/remix/ObserverTest.sol`, and run in order:
+Connect MetaMask to Sepolia, load `smart-contracts/remix/ObserverTest.sol` (self-contained, no imports needed), and run in order:
 
 **1. registerFund**
 
@@ -141,7 +191,7 @@ Verify: `isFundRegistered("be6f2e8a-5474-43c7-a692-7918c37e3f42")` → `true`
 Verify:
 - `isOrderAnchored("test-order-0001-ready-to-anchor")` → `true`
 - `isSettlementAnchored("0xaabb000000000000000000000000000000000000000000000000000000000001")` → `true`
-- Call again with same orderId → should revert with `OrderAlreadyAnchored`
+- Call again with same orderId → reverts with `OrderAlreadyAnchored`
 
 **3. reportSettlement** — order 0003 (already anchored case)
 ```
@@ -153,12 +203,28 @@ Verify:
 ["test-order-0004-tech-only","0xaabb000000000000000000000000000000000000000000000000000000000004","ACQUIRED_WITH_LOCK",true,false,"0xdeadbeef00000000000000000000000000000000000000000000000000000004","0xcc110000000000000000000000000000000000000000000000000000000004aa","eip155:51","xrpl:testnet"]
 ```
 
-**5. View calls to verify state**
+**5. Test the CRE `onReport` path**
+
+The constructor sets the forwarder to the simulation address. To call `onReport` from your MetaMask wallet:
+
+```
+setForwarderAddress(YOUR_METAMASK_ADDRESS)
+```
+
+Then call `onReport` with `metadata` = `0x` (empty) and `report` = ABI-encoded `SettlementInput`. This simulates what the KeystoneForwarder does in production.
+
+After testing, restore with:
+```
+setForwarderAddress(0x15fC6ae953E024d975e77382eEeC56A9101f9F88)
+```
+
+**6. View calls to verify state**
 
 | Function | Input | Expected result |
 |---|---|---|
 | `isOrderAnchored` | `"test-order-0001-ready-to-anchor"` | `true` |
 | `isOrderAnchored` | `"test-order-0002-not-settled"` | `false` |
+| `getForwarderAddress` | — | current forwarder |
 | `getSettlementCount` | — | count of anchored settlements |
 | `getLatestSettlement` | `0xaabb...0001` | full SettlementRecord |
 | `getSettlement` | `0` | first record |
@@ -271,11 +337,13 @@ Deploy to Sepolia (set private key in hardhat.config.js `accounts` array or via 
 npx hardhat run scripts/deploy.js --network sepolia
 ```
 
+The deploy script passes the **simulation forwarder** (`0x15fC6ae953E024d975e77382eEeC56A9101f9F88`) to the constructor. Before going to production, call `setForwarderAddress(0xF8344CFd5c43616a4366C34E3EEE75af79a74482)` on the deployed contract.
+
 After deployment:
 1. Set `observerAddress` in `workflow-capitare/config/config.staging.json`
-2. Grant `REPORTER_ROLE` to the CRE wallet on the deployed Observer:
+2. _(Optional but recommended)_ Lock down to your specific workflow:
    ```solidity
-   observer.grantRole(REPORTER_ROLE, CRE_WALLET_ADDRESS)
+   observer.setExpectedWorkflowId(YOUR_WORKFLOW_ID)
    ```
 
 ### CRE workflow
@@ -296,8 +364,9 @@ bun install --cwd ./workflow-capitare
 Set CRE secrets (stored in the DON, not locally):
 ```
 CAPITARE_OBSERVER_KEY=<from observer-api.env>
-CRE_TRANSACTION_PRIVATE_KEY=<CRE wallet private key>
 ```
+
+> `CRE_TRANSACTION_PRIVATE_KEY` is no longer needed — the DON signs and submits transactions through the KeystoneForwarder internally.
 
 Simulate — CRON trigger (no payload needed):
 ```bash
