@@ -158,9 +158,10 @@ const capitareGet = (
 ): CapitareResult => {
   const { capitareBaseUrl, capitareClientId } = runtime.config
   const url = `${capitareBaseUrl}${path}`
-  return httpClient.sendRequest(
+  // Serialize to string — consensusIdenticalAggregation only reliably handles primitives
+  const raw = httpClient.sendRequest(
     runtime,
-    (sendRequester: HTTPSendRequester): CapitareResult => {
+    (sendRequester: HTTPSendRequester): string => {
       const r = sendRequester.sendRequest({
         url,
         method: "GET",
@@ -171,12 +172,13 @@ const capitareGet = (
         },
         body: bytesToBase64(new Uint8Array(0)),
       }).result()
-      if (r.statusCode === 404) return { found: false }
+      if (r.statusCode === 404) return JSON.stringify({ found: false })
       if (!ok(r)) throw new Error(`Capitare GET ${path} → HTTP ${r.statusCode}`)
-      return { found: true, body: json(r) as object }
+      return JSON.stringify({ found: true, body: json(r) })
     },
-    consensusIdenticalAggregation<CapitareResult>()
+    consensusIdenticalAggregation<string>()
   )().result()
+  return JSON.parse(raw) as CapitareResult
 }
 
 // ─── Node-mode: submit signed tx ─────────────────────────────────────────────
