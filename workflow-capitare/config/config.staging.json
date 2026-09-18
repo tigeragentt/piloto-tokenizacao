@@ -6,5 +6,6 @@
   "schedule": "0 */2 * * * *",
   "sepoliaRpcUrl": "https://ethereum-sepolia-rpc.publicnode.com",
   "sepoliaChainId": 11155111,
-  "observerAddress": "0x84E0439Da40a543E45847841393d71A45A715537"
+  "observerAddress": "0x84E0439Da40a543E45847841393d71A45A715537",
+  "maxOrdersPerRun": 1
 }

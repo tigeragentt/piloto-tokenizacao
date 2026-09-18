@@ -26,6 +26,7 @@ export type Config = {
   sepoliaRpcUrl: string
   sepoliaChainId: number
   observerAddress: string   // Observer.sol on Sepolia; "" = disabled
+  maxOrdersPerRun: number   // max ACQUIRED_WITH_LOCK orders to anchor per execution; 1 for simulation (15 HTTP call limit)
 }
 
 // ─── Observer.sol ABI ────────────────────────────────────────────────────────
@@ -294,8 +295,9 @@ const anchorSettlement = async (
 // ─── Main scan ────────────────────────────────────────────────────────────────
 
 const scanAndAnchor = async (runtime: Runtime<Config>): Promise<ScanResult> => {
-  const { observerAddress, fundId } = runtime.config
+  const { observerAddress, fundId, maxOrdersPerRun } = runtime.config
   const result: ScanResult = { ordersChecked: 0, anchored: 0, skipped: 0, errors: [] }
+  let processed = 0
 
   const observerKey = runtime.getSecret({ id: "capitare_observer_key" }).result().value as string
   const httpClient = new HTTPClient()
@@ -315,6 +317,11 @@ const scanAndAnchor = async (runtime: Runtime<Config>): Promise<ScanResult> => {
   }
 
   for (const order of orders) {
+    if (processed >= maxOrdersPerRun) {
+      runtime.log(`Reached maxOrdersPerRun=${maxOrdersPerRun} — stopping early (${orders.length - result.skipped - processed} order(s) deferred)`)
+      break
+    }
+
     if (order.progress !== "ACQUIRED_WITH_LOCK") {
       runtime.log(`Order ${order.id}: progress=${order.progress} — skip (not settled)`)
       result.skipped++
@@ -357,10 +364,12 @@ const scanAndAnchor = async (runtime: Runtime<Config>): Promise<ScanResult> => {
 
       await anchorSettlement(runtime, httpClient, order, settlement)
       result.anchored++
+      processed++
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       runtime.log(`Order ${order.id}: ERROR — ${msg}`)
       result.errors.push(`${order.id}: ${msg}`)
+      processed++
     }
   }
 
