@@ -29,7 +29,7 @@ escrow proxy (per-order, EIP-1167)
 ```
 
 **Observer.sol** (Ethereum Sepolia) is the immutable supervisability layer:
-- Chainlink CRE workflows anchor settlement proofs from the Capitare API
+- Chainlink CRE workflows anchor settlement proofs from the Observer API
 - CVM can independently verify `deliveryProofSHA256` and `resolutionHash` without trusting any intermediary
 - Implements `IReceiver` (ReceiverTemplate pattern) — the Chainlink KeystoneForwarder calls `onReport()` with DON-signed reports
 
@@ -47,7 +47,7 @@ smart-contracts/
     TObserver.sol        v1.3.0 — ReceiverTemplate + AccessControl; fundId in all structs
     ReceiverTemplate.sol Flat copy for Remix (no imports needed)
     ObserverTestV1.sol   v1.0.0 — original monolithic contract, kept for comparison
-workflow-observer/       CRE workflow: polls Capitare API, anchors proofs on-chain
+workflow-observer/       CRE workflow: polls Observer API, anchors proofs on-chain
 frontend/                React dashboard (Vite) — Dashboard, Orders, Observer, XDC, CRE pages
 project.yaml             CRE project config (Sepolia chain selector + RPC)
 secrets.yaml             CRE secret name → env var mapping (no actual values)
@@ -190,11 +190,11 @@ See [`smart-contracts/remix/remix.md`](smart-contracts/remix/remix.md) for compi
 
 ## Local testing (no real API needed)
 
-Start the Capitare mock server (zero dependencies, Node built-in only):
+Start the Observer API mock server (zero dependencies, Node built-in only):
 
 ```bash
 node test/mock-server.js
-# Capitare mock server running on http://localhost:3001
+# Observer API mock server running on http://localhost:3001
 ```
 
 Run the CRE workflow against the mock:
@@ -207,7 +207,7 @@ cre workflow simulate workflow-observer --target test-settings --non-interactive
 
 ## Frontend
 
-React + Vite dashboard. Pages: Dashboard, Orders, Observer, Capitare, XDC, CRE.
+React + Vite dashboard. Pages: Dashboard, Orders, Observer, API, XDC, CRE.
 
 ### Local dev
 
@@ -292,7 +292,7 @@ Deploy (staging):
 bunx cre deploy --env staging
 ```
 
-## Capitare API endpoints used
+## Observer API endpoints used
 
 | Endpoint | Purpose |
 |---|---|
