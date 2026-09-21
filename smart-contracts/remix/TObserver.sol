@@ -44,17 +44,16 @@ contract TObserver is ReceiverTemplate, AccessControl {
         Mint,                  // 1
         Burn,                  // 2
         Approve,               // 3
-        FIDCFundCreated,       // 4  FIDC fund created on XDC
-        Invested,              // 5  quota investment
-        EscrowCreated,         // 6  EIP-1167 escrow proxy deployed
-        Whitelisted,           // 7  address added to custody or payment whitelist
-        Withdrawn,             // 8
-        FundingAcknowledged,   // 9  FIDC acknowledged cash lock
-        LockResolved,          // 10 escrow cash lock released on XDC
-        ExcessReturned,        // 11
-        DeliveryProofAnchored, // 12 delivery proof SHA256 anchored
-        SettlementProofAnchored, // 13 full settlement proof anchored
-        Divergence             // 14 cross-chain mismatch detected
+        Invested,              // 4  quota investment
+        EscrowCreated,         // 5  EIP-1167 escrow proxy deployed
+        Whitelisted,           // 6  address added to custody or payment whitelist
+        Withdrawn,             // 7
+        FundingAcknowledged,   // 8  FIDC acknowledged cash lock
+        LockResolved,          // 9  escrow cash lock released on XDC
+        ExcessReturned,        // 10
+        DeliveryProofAnchored, // 11 delivery proof SHA256 anchored
+        SettlementProofAnchored, // 12 full settlement proof anchored
+        Divergence             // 13 cross-chain mismatch detected
     }
 
     struct ActionRecord {
