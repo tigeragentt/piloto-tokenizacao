@@ -6,7 +6,10 @@
 |---|---|
 | Compiler | 0.8.36 |
 | EVM version | cancun |
-| Optimizer | enabled, 200 runs |
+| Optimizer | enabled, **1 run** |
+
+> **Why 1 run?** TObserver is a large contract (AccessControl + ReceiverTemplate). Runs=1 minimizes
+> bytecode size (fits under the 24 KB EIP-170 limit). Gas efficiency doesn't matter for a test contract.
 
 ## Files
 
