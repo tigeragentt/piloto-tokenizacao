@@ -43,7 +43,7 @@ export default function CREPage() {
     <div>
       <h1 className="page-title">CRE Workflow</h1>
       <p className="page-subtitle">
-        workflow-observer — polls Capitare Observer API and anchors settlement proofs on Ethereum Sepolia via Observer.sol
+        workflow-observer — polls Observer API and anchors settlement proofs on Ethereum Sepolia via Observer.sol
       </p>
 
       {/* ── Workflow info ── */}
@@ -56,7 +56,7 @@ export default function CREPage() {
             <tr><td>YAML config</td><td><code>workflow-observer/workflow.yaml</code></td></tr>
             <tr><td>Staging name</td><td><code>workflow-observer-staging</code></td></tr>
             <tr><td>Default schedule</td><td><code>0 */2 * * * *</code> (every 2 minutes)</td></tr>
-            <tr><td>Source</td><td>Capitare Observer API → <code>ACQUIRED_WITH_LOCK</code> orders with <code>technicalSettlementCompleted = true</code></td></tr>
+            <tr><td>Source</td><td>Observer API → <code>ACQUIRED_WITH_LOCK</code> orders with <code>technicalSettlementCompleted = true</code></td></tr>
             <tr><td>Target</td><td>Observer.sol on Ethereum Sepolia — <code>reportSettlement()</code></td></tr>
             <tr><td>Secrets</td>
               <td>

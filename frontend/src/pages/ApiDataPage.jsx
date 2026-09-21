@@ -22,7 +22,7 @@ const readContract = readProvider
   ? new ethers.Contract(OBSERVER_ADDRESS, OBSERVER_ABI, readProvider)
   : null
 
-export default function CapitarePage() {
+export default function ApiDataPage() {
   const { account, connectWallet } = useWallet()
   const [rows, setRows] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -124,12 +124,12 @@ export default function CapitarePage() {
         </button>
       </div>
       <p className="page-subtitle">
-        Workflow simulation — Capitare orders vs. Observer.sol anchoring status on Sepolia
+        Workflow simulation — Observer API orders vs. Observer.sol anchoring status on Sepolia
       </p>
 
       {!apiKey && (
         <div className="alert alert-warn">
-          Capitare API key not set — go to the <strong>Orders</strong> page to set it first.
+          Observer API key not set — go to the <strong>Orders</strong> page to set it first.
         </div>
       )}
       {!OBSERVER_ADDRESS && (
@@ -156,7 +156,7 @@ export default function CapitarePage() {
 
       {rows && (
         <div className="card">
-          <div className="card-title">Orders — Capitare → Observer</div>
+          <div className="card-title">Orders — API → Observer</div>
           {rows.length === 0 ? (
             <p style={{ color: 'var(--text-dim)' }}>No orders found.</p>
           ) : (

@@ -196,7 +196,7 @@ export default function XDCPage() {
         </table>
         <p style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 10 }}>
           Each settlement creates an escrow: BRL-CVM is locked here while CVD IOU is delivered on XRPL.
-          The lock is released (or refunded) when the Capitare Observer confirms resolution.
+          The lock is released (or refunded) when the Observer API confirms resolution.
         </p>
       </div>
 
@@ -207,7 +207,7 @@ export default function XDCPage() {
         <ol style={{ fontSize: 13, color: 'var(--text-dim)', lineHeight: 2.2, paddingLeft: 20, margin: 0 }}>
           <li><strong style={{ color: 'var(--text)' }}>Lock</strong> — BRL-CVM escrow created on XDC Apothem</li>
           <li><strong style={{ color: 'var(--text)' }}>Deliver</strong> — CVD (debenture IOU) delivered on XRPL testnet by custodian</li>
-          <li><strong style={{ color: 'var(--text)' }}>Resolve</strong> — Capitare confirms <code>LockResolved</code> event; BRL-CVM released to issuer</li>
+          <li><strong style={{ color: 'var(--text)' }}>Resolve</strong> — Observer API confirms <code>LockResolved</code> event; BRL-CVM released to issuer</li>
           <li><strong style={{ color: 'var(--text)' }}>Anchor</strong> — CRE workflow reports settlement proof to Observer.sol on Ethereum Sepolia</li>
         </ol>
         <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-dim)' }}>

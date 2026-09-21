@@ -186,13 +186,13 @@ export default function OrdersPage() {
         </button>
       </div>
       <p className="page-subtitle">
-        Debenture orders from the Capitare Observer API &mdash; fund{' '}
+        Debenture orders from the Observer API &mdash; fund{' '}
         <code style={{ fontSize: 11 }}>{FUND_ID}</code>
       </p>
 
       {/* ── API Key settings ── */}
       <div className="card">
-        <div className="card-title">Capitare Observer API Key</div>
+        <div className="card-title">Observer API Key</div>
         {!editingKey && apiKey ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ color: 'var(--green)', fontSize: 13 }}>✓ API key set</span>
@@ -223,7 +223,7 @@ export default function OrdersPage() {
 
       {error && <div className="alert alert-warn">{error}</div>}
       {!apiKey && !error && (
-        <div className="alert alert-info">Set your Capitare Observer API key above to load orders.</div>
+        <div className="alert alert-info">Set your Observer API key above to load orders.</div>
       )}
 
       {orders && (

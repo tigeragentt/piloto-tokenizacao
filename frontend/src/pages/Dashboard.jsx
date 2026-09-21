@@ -46,7 +46,7 @@ export default function Dashboard() {
 
     const [obs, ord] = await Promise.all([
       fetchObserverSummary().catch(e => { errs.push('Observer: ' + (e.message || e)); return null }),
-      fetchOrderSummary().catch(e => { errs.push('Capitare API: ' + (e.message || e)); return null }),
+      fetchOrderSummary().catch(e => { errs.push('Observer API: ' + (e.message || e)); return null }),
     ])
     setObserver(obs)
     setOrders(ord)
@@ -98,7 +98,7 @@ export default function Dashboard() {
       <div className="dash-bottom">
         {/* ── Recent Orders ── */}
         <div className="card">
-          <div className="card-title">Recent Orders (Capitare API)</div>
+          <div className="card-title">Recent Orders (Observer API)</div>
           {orders?.items?.length > 0 ? (
             <table className="info-table" style={{ fontSize: 12 }}>
               <thead>

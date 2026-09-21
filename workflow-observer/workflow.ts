@@ -47,7 +47,7 @@ const OBSERVER_ABI = [
   },
 ] as const
 
-// ─── Capitare API types ───────────────────────────────────────────────────────
+// ─── Observer API types ───────────────────────────────────────────────────────
 
 type Order = {
   id: string
@@ -82,7 +82,7 @@ type ScanResult = {
 }
 
 // Envelope returned by apiGet — never null (CRE consensus can't wrap null)
-type CapitareResult = { found: false } | { found: true; body: object }
+type ApiResult = { found: false } | { found: true; body: object }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -94,14 +94,14 @@ const toBytes32 = (hex: string): `0x${string}` => {
 
 const ZERO_BYTES32: `0x${string}` = "0x0000000000000000000000000000000000000000000000000000000000000000"
 
-// ─── Capitare API helpers ─────────────────────────────────────────────────────
+// ─── Observer API helpers ─────────────────────────────────────────────────────
 
 const apiGet = (
   runtime: Runtime<Config>,
   httpClient: HTTPClient,
   path: string,
   observerKey: string,
-): CapitareResult => {
+): ApiResult => {
   const { apiBaseUrl, apiClientId } = runtime.config
   const url = `${apiBaseUrl}${path}`
   // Serialize to string — consensusIdenticalAggregation only reliably handles primitives
@@ -119,12 +119,12 @@ const apiGet = (
         body: bytesToBase64(new Uint8Array(0)),
       }).result()
       if (r.statusCode === 404) return JSON.stringify({ found: false })
-      if (!ok(r)) throw new Error(`Capitare GET ${path} → HTTP ${r.statusCode}`)
+      if (!ok(r)) throw new Error(`Observer API GET ${path} → HTTP ${r.statusCode}`)
       return JSON.stringify({ found: true, body: json(r) })
     },
     consensusIdenticalAggregation<string>()
   )().result()
-  return JSON.parse(raw) as CapitareResult
+  return JSON.parse(raw) as ApiResult
 }
 
 // ─── Observer check ───────────────────────────────────────────────────────────
@@ -223,13 +223,13 @@ const anchorSettlement = (
 
 // ─── Main scan ────────────────────────────────────────────────────────────────
 
-// Polls the Capitare API for all debenture orders in the configured fund, then
+// Polls the Observer API for all debenture orders in the configured fund, then
 // anchors each fully-settled order on-chain via the Observer contract.
 //
 // For each order it:
 //   1. Skips orders whose progress is not "ACQUIRED_WITH_LOCK" (not yet settled)
 //   2. Skips orders already anchored on-chain (idempotent — reads Observer.isOrderAnchored)
-//   3. Fetches the settlement proof from Capitare (deliveryProofSHA256, resolutionHash, etc.)
+//   3. Fetches the settlement proof from the Observer API (deliveryProofSHA256, resolutionHash, etc.)
 //   4. Skips if technicalSettlementCompleted is false
 //   5. Calls Observer.reportSettlement via CRE writeReport — the DON signs and submits the tx
 //

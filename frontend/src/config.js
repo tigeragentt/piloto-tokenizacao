@@ -35,7 +35,7 @@ export const XDC_FIDC         = '0x8001BB21f4F061b444F02f50Ab76BAA6a84394A2'
 export const XDC_STABLE       = '0x243e98638D619eB6f10eaBbaCfC071f318D5e9d0'  // BRL-CVM
 export const XDC_ESCROW_FACTORY = '0x5f6d0B7886858ac75c32b9642090067157651Ff4'
 
-// ─── Capitare API ─────────────────────────────────────────────────────────────
+// ─── Observer API ─────────────────────────────────────────────────────────────
 
 export const FUND_ID = 'be6f2e8a-5474-43c7-a692-7918c37e3f42'
 export const API_CLIENT_ID = 'mb-observer-demo'
@@ -54,15 +54,15 @@ export function getApiKey() {
 
 export async function apiGet(path) {
   const key = getApiKey()
-  if (!key) throw new Error('Capitare API key not set. Paste it in the Orders page settings.')
+  if (!key) throw new Error('Observer API key not set. Paste it in the Orders page settings.')
   const resp = await fetch(`${API_BASE}${path}`, {
     headers: {
       'X-Observer-Id': API_CLIENT_ID,
       'X-Observer-Key': key,
     },
   })
-  if (resp.status === 401) throw new Error('Unauthorized — check your Capitare Observer API key.')
-  if (!resp.ok) throw new Error(`Capitare API ${resp.status}: ${await resp.text().catch(() => '')}`)
+  if (resp.status === 401) throw new Error('Unauthorized — check your Observer API key.')
+  if (!resp.ok) throw new Error(`Observer API ${resp.status}: ${await resp.text().catch(() => '')}`)
   return resp.json()
 }
 
