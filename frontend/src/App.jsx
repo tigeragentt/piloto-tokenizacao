@@ -35,7 +35,7 @@ export default function App() {
               CRE
             </NavLink>
             <NavLink to="/capitare" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
-              Capitare
+              API
             </NavLink>
           </nav>
           <WalletButton />

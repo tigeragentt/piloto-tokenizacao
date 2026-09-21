@@ -118,7 +118,7 @@ export default function CapitarePage() {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-        <h1 className="page-title">Capitare</h1>
+        <h1 className="page-title">API</h1>
         <button className="btn btn-secondary btn-sm" onClick={loadAll} disabled={loading || !apiKey}>
           {loading ? <><span className="spinner" />Loading…</> : 'Refresh'}
         </button>
