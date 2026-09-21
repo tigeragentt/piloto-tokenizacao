@@ -47,7 +47,7 @@ smart-contracts/
     TObserver.sol        v1.3.0 — ReceiverTemplate + AccessControl; fundId in all structs
     ReceiverTemplate.sol Flat copy for Remix (no imports needed)
     ObserverTestV1.sol   v1.0.0 — original monolithic contract, kept for comparison
-workflow-capitare/       CRE workflow: polls Capitare API, anchors proofs on-chain
+workflow-observer/       CRE workflow: polls Capitare API, anchors proofs on-chain
 frontend/                React dashboard (Vite) — Dashboard, Orders, Observer, XDC, CRE pages
 project.yaml             CRE project config (Sepolia chain selector + RPC)
 secrets.yaml             CRE secret name → env var mapping (no actual values)
@@ -107,17 +107,17 @@ All four non-secret values are already in `config.staging.json`. Only `CAPITARE_
 
 ```bash
 # CRON trigger — scans all orders and anchors settled ones
-cre workflow simulate workflow-capitare --target staging-settings --non-interactive --trigger-index 0
+cre workflow simulate workflow-observer --target staging-settings --non-interactive --trigger-index 0
 
 # HTTP trigger — same logic, manual fire
-cre workflow simulate workflow-capitare --target staging-settings --non-interactive --trigger-index 1 --http-payload ./workflow-capitare/payload.json
+cre workflow simulate workflow-observer --target staging-settings --non-interactive --trigger-index 1 --http-payload ./workflow-observer/payload.json
 ```
 
 **Option C — run against the mock (no real API or keys needed)**
 
 ```bash
 node test/mock-server.js &
-cre workflow simulate workflow-capitare --target test-settings --non-interactive --trigger-index 0
+cre workflow simulate workflow-observer --target test-settings --non-interactive --trigger-index 0
 ```
 
 ---
@@ -200,7 +200,7 @@ node test/mock-server.js
 Run the CRE workflow against the mock:
 
 ```bash
-cre workflow simulate workflow-capitare --target test-settings --non-interactive --trigger-index 0
+cre workflow simulate workflow-observer --target test-settings --non-interactive --trigger-index 0
 ```
 
 ---
@@ -261,7 +261,7 @@ Deploy to Sepolia — deployment order:
 2. Deploy `Observer(forwarderAddress, observerFundAddress)`
 
 After deployment:
-1. Set `observerAddress` in `workflow-capitare/config/config.staging.json`
+1. Set `observerAddress` in `workflow-observer/config/config.staging.json`
 2. Set `OBSERVER_ADDRESS` and `OBSERVER_FUND_ADDRESS` in `frontend/.env`
 3. _(Recommended)_ Lock down to your specific workflow after deploying to CRE:
    ```solidity
@@ -274,7 +274,7 @@ After deployment:
 cp .env.example .env
 # set CRE_ETH_PRIVATE_KEY in .env
 
-bun install --cwd ./workflow-capitare
+bun install --cwd ./workflow-observer
 ```
 
 Set CRE secrets (stored in the DON):
@@ -284,7 +284,7 @@ CAPITARE_OBSERVER_KEY=<from observer-api.env>
 
 Simulate:
 ```bash
-cre workflow simulate workflow-capitare --target staging-settings --non-interactive --trigger-index 0
+cre workflow simulate workflow-observer --target staging-settings --non-interactive --trigger-index 0
 ```
 
 Deploy (staging):

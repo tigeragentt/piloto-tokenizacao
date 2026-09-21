@@ -4,7 +4,7 @@
 
 test-settings:
   user-workflow:
-    workflow-name: "workflow-capitare-test"
+    workflow-name: "workflow-observer-test"
     deployment-registry: "private"
   workflow-artifacts:
     workflow-path: "./main.ts"
@@ -14,7 +14,7 @@ test-settings:
 # ==========================================================================
 staging-settings:
   user-workflow:
-    workflow-name: "workflow-capitare-staging"
+    workflow-name: "workflow-observer-staging"
     deployment-registry: "private"
   workflow-artifacts:
     workflow-path: "./main.ts"
@@ -24,7 +24,7 @@ staging-settings:
 # ==========================================================================
 production-settings:
   user-workflow:
-    workflow-name: "workflow-capitare"
+    workflow-name: "workflow-observer"
     deployment-registry: "private"
   workflow-artifacts:
     workflow-path: "./main.ts"
