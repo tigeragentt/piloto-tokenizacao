@@ -2,7 +2,6 @@
 pragma solidity 0.8.36;
 
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 interface IReceiver is IERC165 {
     function onReport(bytes calldata metadata, bytes calldata report) external;
@@ -11,19 +10,43 @@ interface IReceiver is IERC165 {
 /// @title ReceiverTemplate — abstract receiver with optional permission controls
 /// @notice Provides flexible, updatable security checks for receiving workflow reports.
 ///         Source: https://github.com/tigeragentt/cre-world-cup-prediction-market/blob/main/contracts/interfaces/ReceiverTemplate.sol
-/// @dev The forwarder address is required at construction time for security.
-abstract contract ReceiverTemplate is IReceiver, Ownable {
-    // Required: only this address can call onReport
+/// @dev Ownable is intentionally NOT inherited here so that subcontracts can add
+///      AccessControl (or any other OZ auth) without triggering a C3 linearization
+///      conflict. Owner management is inlined instead.
+abstract contract ReceiverTemplate is IReceiver {
+    // ─── Inlined owner pattern ────────────────────────────────────────────────
+
+    address private _rtOwner;
+
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
+    error OwnableUnauthorizedAccount(address account);
+    error OwnableInvalidOwner(address owner);
+
+    modifier onlyOwner() {
+        if (msg.sender != _rtOwner) revert OwnableUnauthorizedAccount(msg.sender);
+        _;
+    }
+
+    function owner() public view returns (address) { return _rtOwner; }
+
+    function transferOwnership(address newOwner) external onlyOwner {
+        if (newOwner == address(0)) revert OwnableInvalidOwner(newOwner);
+        address prev = _rtOwner;
+        _rtOwner = newOwner;
+        emit OwnershipTransferred(prev, newOwner);
+    }
+
+    // ─── Forwarder state ─────────────────────────────────────────────────────
+
     address private s_forwarderAddress;
 
-    // Optional permission fields (zero = disabled)
-    address private s_expectedAuthor;        // only reports from this workflow owner
-    bytes10 private s_expectedWorkflowName;  // only validated when s_expectedAuthor is also set
-    bytes32 private s_expectedWorkflowId;    // only reports from this specific workflow ID
+    address private s_expectedAuthor;
+    bytes10 private s_expectedWorkflowName;
+    bytes32 private s_expectedWorkflowId;
 
     bytes private constant HEX_CHARS = "0123456789abcdef";
 
-    // Custom errors
     error InvalidForwarderAddress();
     error InvalidSender(address sender, address expected);
     error InvalidAuthor(address received, address expected);
@@ -31,7 +54,6 @@ abstract contract ReceiverTemplate is IReceiver, Ownable {
     error InvalidWorkflowId(bytes32 received, bytes32 expected);
     error WorkflowNameRequiresAuthorValidation();
 
-    // Events
     event ForwarderAddressUpdated(address indexed previousForwarder, address indexed newForwarder);
     event ExpectedAuthorUpdated(address indexed previousAuthor, address indexed newAuthor);
     event ExpectedWorkflowNameUpdated(bytes10 indexed previousName, bytes10 indexed newName);
@@ -39,8 +61,10 @@ abstract contract ReceiverTemplate is IReceiver, Ownable {
     event SecurityWarning(string message);
 
     /// @param _forwarderAddress Address of the Chainlink Forwarder contract (cannot be address(0))
-    constructor(address _forwarderAddress) Ownable(msg.sender) {
+    constructor(address _forwarderAddress) {
         if (_forwarderAddress == address(0)) revert InvalidForwarderAddress();
+        _rtOwner = msg.sender;
+        emit OwnershipTransferred(address(0), msg.sender);
         s_forwarderAddress = _forwarderAddress;
         emit ForwarderAddressUpdated(address(0), _forwarderAddress);
     }
@@ -50,7 +74,6 @@ abstract contract ReceiverTemplate is IReceiver, Ownable {
     function getExpectedWorkflowName() external view returns (bytes10) { return s_expectedWorkflowName; }
     function getExpectedWorkflowId() external view returns (bytes32) { return s_expectedWorkflowId; }
 
-    /// @notice Update the forwarder address. Setting address(0) disables the check (INSECURE).
     function setForwarderAddress(address _forwarder) external onlyOwner {
         address prev = s_forwarderAddress;
         if (_forwarder == address(0)) emit SecurityWarning("Forwarder address set to zero - contract is now INSECURE");
@@ -64,8 +87,6 @@ abstract contract ReceiverTemplate is IReceiver, Ownable {
         emit ExpectedAuthorUpdated(prev, _author);
     }
 
-    /// @notice Restrict onReport to a specific workflow name.
-    /// @dev REQUIRES setExpectedAuthor() to also be set — name alone is not collision-safe.
     function setExpectedWorkflowName(string calldata _name) external onlyOwner {
         bytes10 prev = s_expectedWorkflowName;
         if (bytes(_name).length == 0) {
@@ -111,10 +132,8 @@ abstract contract ReceiverTemplate is IReceiver, Ownable {
         _processReport(report);
     }
 
-    /// @notice Implement this with your contract's business logic.
     function _processReport(bytes calldata report) internal virtual;
 
-    /// @notice Decode Forwarder metadata: abi.encodePacked(workflowId, workflowName, workflowOwner)
     function _decodeMetadata(bytes memory metadata)
         internal pure
         returns (bytes32 workflowId, bytes10 workflowName, address workflowOwner)
@@ -136,7 +155,7 @@ abstract contract ReceiverTemplate is IReceiver, Ownable {
     }
 
     /// @inheritdoc IERC165
-    function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool) {
         return interfaceId == type(IReceiver).interfaceId || interfaceId == type(IERC165).interfaceId;
     }
 }

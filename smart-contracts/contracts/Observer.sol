@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.36;
 
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {ReceiverTemplate} from "./interfaces/ReceiverTemplate.sol";
-import {ObserverFund} from "./ObserverFund.sol";
+import {IObserverFund} from "./interfaces/IObserverFund.sol";
 
 /**
  * @title Observer
@@ -21,11 +22,11 @@ import {ObserverFund} from "./ObserverFund.sol";
  *           2. Deploy Observer (pass forwarder address + ObserverFund address)
  *
  *         CRE write path: KeystoneForwarder → onReport() [ReceiverTemplate] → _processReport()
- *         Direct write path: owner calls reportSettlement() / reportAction()
+ *         Direct write path: REPORTER_ROLE calls reportSettlement() / reportAction()
  *
  * @custom:security-contact sol@abtoken.xyz
  */
-contract Observer is ReceiverTemplate {
+contract Observer is ReceiverTemplate, AccessControl {
 
     // ─── Errors ─────────────────────────────────────────────────────────────
 
@@ -38,11 +39,13 @@ contract Observer is ReceiverTemplate {
 
     // ─── Constants ───────────────────────────────────────────────────────────
 
-    string public constant VERSION = "1.6.0";
+    string public constant VERSION = "1.7.0";
+    bytes32 public constant ADMIN_ROLE    = keccak256("ADMIN_ROLE");
+    bytes32 public constant REPORTER_ROLE = keccak256("REPORTER_ROLE");
 
     // ─── Fund reference ───────────────────────────────────────────────────────
 
-    ObserverFund public fund;
+    IObserverFund public funds;
 
     // ─── General Action Log ──────────────────────────────────────────────────
 
@@ -150,10 +153,13 @@ contract Observer is ReceiverTemplate {
     ///        Production Sepolia: 0xF8344CFd5c43616a4366C34E3EEE75af79a74482
     /// @param _fund Address of the deployed ObserverFund contract.
     constructor(address _forwarderAddress, address _fund) ReceiverTemplate(_forwarderAddress) {
-        fund = ObserverFund(_fund);
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(ADMIN_ROLE, msg.sender);
+        _grantRole(REPORTER_ROLE, msg.sender);
+        funds = IObserverFund(_fund);
     }
 
-    // ─── Direct write path (onlyOwner — bypass CRE for admin / recovery) ─────
+    // ─── Direct write path (REPORTER_ROLE) ───────────────────────────────────
 
     function reportAction(
         string     calldata fundId,
@@ -163,8 +169,8 @@ contract Observer is ReceiverTemplate {
         string     calldata to,
         uint256             amount,
         string     calldata txHash
-    ) external onlyOwner returns (uint256 recordId) {
-        if (!fund.isFundRegistered(fundId)) revert FundNotRegistered();
+    ) external onlyRole(REPORTER_ROLE) returns (uint256 recordId) {
+        if (!funds.isFundRegistered(fundId)) revert FundNotRegistered();
         bytes32 txKey = keccak256(abi.encodePacked(network, txHash));
         if (_txAnchored[txKey]) revert ActionAlreadyAnchored();
         _txAnchored[txKey] = true;
@@ -179,7 +185,7 @@ contract Observer is ReceiverTemplate {
         emit ActionReported(recordId, network, txHash, fundId, action, from, to, amount, block.timestamp);
     }
 
-    function reportSettlement(SettlementInput calldata s) external onlyOwner returns (uint256 recordId) {
+    function reportSettlement(SettlementInput calldata s) external onlyRole(REPORTER_ROLE) returns (uint256 recordId) {
         return _reportSettlement(s);
     }
 
@@ -193,7 +199,7 @@ contract Observer is ReceiverTemplate {
     }
 
     function _reportSettlement(SettlementInput memory s) internal returns (uint256 recordId) {
-        if (!fund.isFundRegistered(s.fundId)) revert FundNotRegistered();
+        if (!funds.isFundRegistered(s.fundId)) revert FundNotRegistered();
         if (_orderAnchored[s.orderId]) revert OrderAlreadyAnchored();
         _orderAnchored[s.orderId] = true;
         recordId = _settlements.length;
@@ -218,6 +224,12 @@ contract Observer is ReceiverTemplate {
             s.technicalCompleted, s.accountingCompleted,
             s.deliveryProofSHA256, s.resolutionHash, block.timestamp
         );
+    }
+
+    // ─── ERC165 ───────────────────────────────────────────────────────────────
+
+    function supportsInterface(bytes4 interfaceId) public view override(AccessControl, ReceiverTemplate) returns (bool) {
+        return AccessControl.supportsInterface(interfaceId) || ReceiverTemplate.supportsInterface(interfaceId);
     }
 
     // ─── Existence Checks ─────────────────────────────────────────────────────
@@ -266,7 +278,6 @@ contract Observer is ReceiverTemplate {
         for (uint256 i = 0; i < n; i++) result[i] = _settlements[fromIndex + i];
     }
 
-    /// @notice Returns all settlement record IDs anchored for a given fund.
     function getSettlementsByFund(string calldata fundId) external view returns (uint256[] memory) {
         return _fundSettlements[fundId];
     }
@@ -297,7 +308,6 @@ contract Observer is ReceiverTemplate {
         for (uint256 i = 0; i < n; i++) result[i] = _actions[fromIndex + i];
     }
 
-    /// @notice Returns all action record IDs anchored for a given fund.
     function getActionsByFund(string calldata fundId) external view returns (uint256[] memory) {
         return _fundActions[fundId];
     }

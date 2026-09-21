@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.36;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {IObserverFund} from "./interfaces/IObserverFund.sol";
 
 /**
  * @title ObserverFund
@@ -10,7 +11,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
  *
  * @custom:security-contact sol@abtoken.xyz
  */
-contract ObserverFund is Ownable {
+contract ObserverFund is AccessControl, IObserverFund {
 
     // ─── Errors ─────────────────────────────────────────────────────────────
 
@@ -19,31 +20,10 @@ contract ObserverFund is Ownable {
     error InvalidRange();
     error OutOfBounds();
 
-    // ─── Structs ─────────────────────────────────────────────────────────────
+    // ─── Constants ───────────────────────────────────────────────────────────
 
-    struct FundInput {
-        string  fundId;
-        string  name;
-        string  xdcNetwork;
-        address xdcFidcManager;
-        address xdcStable;
-        address xdcEscrowFactory;
-        string  xrplNetwork;
-        string  xrplIssuer;
-        string  debentureCurrency;
-    }
-
-    struct FundInfo {
-        string  fundId;              // Capitare fund UUID
-        string  name;                // e.g. "Horizonte Crédito Multirrede FIDC — Piloto XDC"
-        string  xdcNetwork;          // "eip155:51"
-        address xdcFidcManager;      // fidc-manager contract
-        address xdcStable;           // BRL-CVM stable token (ERC-20)
-        address xdcEscrowFactory;    // escrow-factory contract
-        string  xrplNetwork;         // "xrpl:testnet"
-        string  xrplIssuer;          // XRPL issuer address (r…)
-        string  debentureCurrency;   // "CVD"
-    }
+    string public constant VERSION = "1.1.0";
+    bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
     // ─── State ───────────────────────────────────────────────────────────────
 
@@ -60,11 +40,14 @@ contract ObserverFund is Ownable {
 
     // ─── Constructor ─────────────────────────────────────────────────────────
 
-    constructor(address _owner) Ownable(_owner) {}
+    constructor(address _owner) {
+        _grantRole(DEFAULT_ADMIN_ROLE, _owner);
+        _grantRole(ADMIN_ROLE, _owner);
+    }
 
-    // ─── Write (onlyOwner) ────────────────────────────────────────────────────
+    // ─── Write (ADMIN_ROLE) ───────────────────────────────────────────────────
 
-    function registerFund(FundInput calldata f) external onlyOwner {
+    function registerFund(FundInput calldata f) external onlyRole(ADMIN_ROLE) {
         if (_fundIdToIndex[f.fundId] != 0) revert FundAlreadyRegistered();
         _funds.push(FundInfo({
             fundId: f.fundId, name: f.name,
