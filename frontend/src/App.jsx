@@ -12,6 +12,10 @@ export default function App() {
   return (
     <WalletProvider>
       <div className="app">
+        <div className="gov-topbar">
+          <div className="gov-topbar-green" />
+          <div className="gov-topbar-yellow" />
+        </div>
         <header className="app-header">
           <div className="app-logo">
             <span className="logo-icon">T</span>
