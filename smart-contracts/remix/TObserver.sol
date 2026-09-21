@@ -2,24 +2,21 @@
 pragma solidity 0.8.36;
 
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
 import {ReceiverTemplate} from "./ReceiverTemplate.sol";
 import {IObserverFunds} from "./IObserverFunds.sol";
 
 
 /**
- * @title ObserverTest
+ * @title TObserver
  * @notice Remix-only deploy target — mirrors Observer.sol v1.5.0 exactly but:
- *           1. No-arg constructor: defaults to Sepolia simulation forwarder
- *              and deploys an ObserverFund internally for convenience
+ *           1. Constructor takes (_fundAddress) and uses the simulation forwarder
  *           2. reportSettlement() and reportAction() are public (no onlyOwner)
  *         Do NOT deploy this to production. Use contracts/Observer.sol instead.
  *
- * @dev Load ReceiverTemplate.sol, ObserverFund.sol, and ObserverTest.sol into Remix.
- *      After deploying ObserverTest, call fund() to get the ObserverFund address,
- *      then interact with it directly for fund operations (registerFund, etc.).
+ * @dev Load: ReceiverTemplate.sol, IObserverFunds.sol, TObserverFunds.sol, TObserver.sol
+ *      Deploy TObserverFunds first, then pass its address to TObserver constructor.
  */
-contract TObserver is AccessControl, ReceiverTemplate {
+contract TObserver is ReceiverTemplate {
 
 
     // ─── Errors ─────────────────────────────────────────────────────────────
@@ -35,9 +32,7 @@ contract TObserver is AccessControl, ReceiverTemplate {
     // ─── Constants ───────────────────────────────────────────────────────────
 
 
-    string public constant VERSION = "1.1.0";
-    bytes32 public constant ADMIN_ROLE     = keccak256("ADMIN_ROLE");
-    bytes32 public constant REPORTER_ROLE  = keccak256("REPORTER_ROLE");
+    string public constant VERSION = "1.2.0";
 
 
     // Sepolia simulation forwarder — default for no-arg constructor.
@@ -163,8 +158,6 @@ contract TObserver is AccessControl, ReceiverTemplate {
     // Deploys its own ObserverFund for Remix convenience.
     // Call fund() to get the ObserverFund address, then use it directly.
     constructor(address _fundAddress) ReceiverTemplate(SIMULATION_FORWARDER) {
-        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
-        _grantRole(REPORTER_ROLE, msg.sender);        
         funds = IObserverFunds(_fundAddress);
     }
 
@@ -237,8 +230,8 @@ contract TObserver is AccessControl, ReceiverTemplate {
     // ─── ERC165 ───────────────────────────────────────────────────────────────
 
 
-    function supportsInterface(bytes4 interfaceId) public pure override(AccessControl, ReceiverTemplate) returns (bool) {
-        return AccessControl.supportsInterface(interfaceId) || ReceiverTemplate.supportsInterface(interfaceId);
+    function supportsInterface(bytes4 interfaceId) public pure override returns (bool) {
+        return ReceiverTemplate.supportsInterface(interfaceId);
     }
 
 
