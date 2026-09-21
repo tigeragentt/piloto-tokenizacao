@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 const TRIGGER_STORAGE = 'cre_trigger_url'
-const DEFAULT_TRIGGER = 'http://localhost:2000/workflow-capitare-staging/trigger'
+const DEFAULT_TRIGGER = 'http://localhost:2000/workflow-observer-staging/trigger'
 
 export default function CREPage() {
   const [triggerUrl, setTriggerUrl] = useState(
@@ -43,18 +43,18 @@ export default function CREPage() {
     <div>
       <h1 className="page-title">CRE Workflow</h1>
       <p className="page-subtitle">
-        workflow-capitare — polls Capitare Observer API and anchors settlement proofs on Ethereum Sepolia via Observer.sol
+        workflow-observer — polls Capitare Observer API and anchors settlement proofs on Ethereum Sepolia via Observer.sol
       </p>
 
       {/* ── Workflow info ── */}
       <div className="section-label">Workflow Overview</div>
       <div className="card">
-        <div className="card-title">workflow-capitare (TypeScript CRE)</div>
+        <div className="card-title">workflow-observer (TypeScript CRE)</div>
         <table className="info-table">
           <tbody>
-            <tr><td>Workflow file</td><td><code>workflow-capitare/workflow.ts</code></td></tr>
-            <tr><td>YAML config</td><td><code>workflow-capitare/workflow.yaml</code></td></tr>
-            <tr><td>Staging name</td><td><code>workflow-capitare-staging</code></td></tr>
+            <tr><td>Workflow file</td><td><code>workflow-observer/workflow.ts</code></td></tr>
+            <tr><td>YAML config</td><td><code>workflow-observer/workflow.yaml</code></td></tr>
+            <tr><td>Staging name</td><td><code>workflow-observer-staging</code></td></tr>
             <tr><td>Default schedule</td><td><code>0 */2 * * * *</code> (every 2 minutes)</td></tr>
             <tr><td>Source</td><td>Capitare Observer API → <code>ACQUIRED_WITH_LOCK</code> orders with <code>technicalSettlementCompleted = true</code></td></tr>
             <tr><td>Target</td><td>Observer.sol on Ethereum Sepolia — <code>reportSettlement()</code></td></tr>
@@ -135,7 +135,7 @@ export default function CREPage() {
           <li>Set <code>observerAddress</code> in <code>config/config.staging.json</code></li>
           <li>Grant <code>REPORTER_ROLE</code> to the CRE wallet on Observer.sol (use Observer page above)</li>
           <li>Create <code>secrets.yaml</code> with your actual keys (see template in repo root)</li>
-          <li>Run: <code>npm install</code> inside <code>workflow-capitare/</code></li>
+          <li>Run: <code>npm install</code> inside <code>workflow-observer/</code></li>
           <li>Start the CRE node: <code>cre dev --config workflow.yaml</code></li>
           <li>Set the trigger URL above and click "Trigger Scan Now" to test</li>
         </ol>
@@ -170,7 +170,7 @@ export default function CREPage() {
       {/* ── Flow diagram ── */}
       <div className="section-label">Data Flow</div>
       <div className="card">
-        <div className="card-title">workflow-capitare Flow</div>
+        <div className="card-title">workflow-observer Flow</div>
         <div style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--text-dim)', lineHeight: 2.2, padding: 4 }}>
           <div><span style={{ color: 'var(--accent2)' }}>Cron trigger (every 2 min)</span></div>
           <div style={{ paddingLeft: 20 }}>↓ GET /funds/:fundId/debenture-orders</div>
