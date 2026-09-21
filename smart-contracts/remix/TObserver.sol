@@ -2,6 +2,7 @@
 pragma solidity 0.8.36;
 
 
+import "@openzeppelin/contracts/access/AccessControl.sol";
 import {ReceiverTemplate} from "./ReceiverTemplate.sol";
 import {IObserverFunds} from "./IObserverFunds.sol";
 
@@ -10,13 +11,13 @@ import {IObserverFunds} from "./IObserverFunds.sol";
  * @title TObserver
  * @notice Remix-only deploy target — mirrors Observer.sol v1.5.0 exactly but:
  *           1. Constructor takes (_fundAddress) and uses the simulation forwarder
- *           2. reportSettlement() and reportAction() are public (no onlyOwner)
+ *           2. reportSettlement() and reportAction() are public (no role check)
  *         Do NOT deploy this to production. Use contracts/Observer.sol instead.
  *
  * @dev Load: ReceiverTemplate.sol, IObserverFunds.sol, TObserverFunds.sol, TObserver.sol
  *      Deploy TObserverFunds first, then pass its address to TObserver constructor.
  */
-contract TObserver is ReceiverTemplate {
+contract TObserver is ReceiverTemplate, AccessControl {
 
 
     // ─── Errors ─────────────────────────────────────────────────────────────
@@ -33,6 +34,8 @@ contract TObserver is ReceiverTemplate {
 
 
     string public constant VERSION = "1.2.0";
+    bytes32 public constant ADMIN_ROLE    = keccak256("ADMIN_ROLE");
+    bytes32 public constant REPORTER_ROLE = keccak256("REPORTER_ROLE");
 
 
     // Sepolia simulation forwarder — default for no-arg constructor.
@@ -158,6 +161,9 @@ contract TObserver is ReceiverTemplate {
     // Deploys its own ObserverFund for Remix convenience.
     // Call fund() to get the ObserverFund address, then use it directly.
     constructor(address _fundAddress) ReceiverTemplate(SIMULATION_FORWARDER) {
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(ADMIN_ROLE, msg.sender);
+        _grantRole(REPORTER_ROLE, msg.sender);
         funds = IObserverFunds(_fundAddress);
     }
 
@@ -230,8 +236,8 @@ contract TObserver is ReceiverTemplate {
     // ─── ERC165 ───────────────────────────────────────────────────────────────
 
 
-    function supportsInterface(bytes4 interfaceId) public pure override returns (bool) {
-        return ReceiverTemplate.supportsInterface(interfaceId);
+    function supportsInterface(bytes4 interfaceId) public view override(AccessControl, ReceiverTemplate) returns (bool) {
+        return AccessControl.supportsInterface(interfaceId) || ReceiverTemplate.supportsInterface(interfaceId);
     }
 
 

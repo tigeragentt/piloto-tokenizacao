@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.36;
 
-// Remix copy — mirrors contracts/interfaces/ReceiverTemplate.sol exactly.
-// Load both this file and ObserverTest.sol into Remix before compiling.
+// Remix copy — modified from contracts/interfaces/ReceiverTemplate.sol.
+// Difference: owner pattern is inlined (no Ownable import) so this file is
+// compatible with AccessControl inheritance without C3 linearization conflicts.
+// Load this file before TObserverFunds.sol and TObserver.sol.
 
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 
 interface IReceiver is IERC165 {
     function onReport(bytes calldata metadata, bytes calldata report) external;
@@ -14,7 +15,30 @@ interface IReceiver is IERC165 {
 /// @title ReceiverTemplate — abstract receiver with optional permission controls
 /// @notice Provides flexible, updatable security checks for receiving workflow reports.
 ///         Source: https://github.com/tigeragentt/cre-world-cup-prediction-market/blob/main/contracts/interfaces/ReceiverTemplate.sol
-abstract contract ReceiverTemplate is IReceiver, Ownable {
+abstract contract ReceiverTemplate is IReceiver {
+    // ─── Inlined owner (no Ownable import — avoids Context conflict with AccessControl)
+
+    address private _rtOwner;
+
+    error OwnableUnauthorizedAccount(address account);
+
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+
+    modifier onlyOwner() {
+        if (msg.sender != _rtOwner) revert OwnableUnauthorizedAccount(msg.sender);
+        _;
+    }
+
+    function owner() public view returns (address) { return _rtOwner; }
+
+    function transferOwnership(address newOwner) external onlyOwner {
+        address prev = _rtOwner;
+        _rtOwner = newOwner;
+        emit OwnershipTransferred(prev, newOwner);
+    }
+
+    // ─── Receiver state
+
     address private s_forwarderAddress;
     address private s_expectedAuthor;
     bytes10 private s_expectedWorkflowName;
@@ -35,7 +59,9 @@ abstract contract ReceiverTemplate is IReceiver, Ownable {
     event ExpectedWorkflowIdUpdated(bytes32 indexed previousId, bytes32 indexed newId);
     event SecurityWarning(string message);
 
-    constructor(address _forwarderAddress) Ownable(msg.sender) {
+    constructor(address _forwarderAddress) {
+        _rtOwner = msg.sender;
+        emit OwnershipTransferred(address(0), msg.sender);
         if (_forwarderAddress == address(0)) revert InvalidForwarderAddress();
         s_forwarderAddress = _forwarderAddress;
         emit ForwarderAddressUpdated(address(0), _forwarderAddress);
@@ -122,7 +148,7 @@ abstract contract ReceiverTemplate is IReceiver, Ownable {
         return hexStr;
     }
 
-    function supportsInterface(bytes4 interfaceId) public pure virtual override returns (bool) {
+    function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool) {
         return interfaceId == type(IReceiver).interfaceId || interfaceId == type(IERC165).interfaceId;
     }
 }
