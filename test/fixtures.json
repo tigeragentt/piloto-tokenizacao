@@ -1,5 +1,5 @@
 {
-  "_comment": "Fake Capitare API responses for local testing. Used by mock-server.js.",
+  "_comment": "Fake Observer API responses for local testing. Used by mock-server.js.",
   "_fund_id": "be6f2e8a-5474-43c7-a692-7918c37e3f42",
 
   "orders": {

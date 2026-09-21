@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Local mock for the Capitare Observer API.
+// Local mock for the Observer API.
 // Serves routes used by the CRE workflow and frontend.
 // No external dependencies — uses Node built-in http only.
 //
@@ -66,7 +66,7 @@ const server = http.createServer((req, res) => {
 })
 
 server.listen(PORT, () => {
-  console.log(`Capitare mock server running on http://localhost:${PORT}`)
+  console.log(`Observer API mock server running on http://localhost:${PORT}`)
   console.log(`  Orders:     GET http://localhost:${PORT}/v1/external/observer/funds/${FUND_ID}/debenture-orders`)
   console.log(`  Settlement: GET http://localhost:${PORT}/v1/external/observer/funds/${FUND_ID}/debenture-orders/{orderId}/settlement`)
   console.log(`  Proof:      GET http://localhost:${PORT}/v1/external/observer/funds/${FUND_ID}/debenture-orders/{orderId}/proof`)
