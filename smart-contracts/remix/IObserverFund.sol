@@ -2,12 +2,12 @@
 pragma solidity 0.8.36;
 
 /**
- * @title IObserverFunds
+ * @title IObserverFund
  * @notice Interface for the FIDC fund registry contract.
  *         TObserver (and any future consumer) depends on this interface,
  *         not on the concrete TObserverFunds implementation.
  */
-interface IObserverFunds {
+interface IObserverFund {
 
     // ─── Structs ─────────────────────────────────────────────────────────────
 

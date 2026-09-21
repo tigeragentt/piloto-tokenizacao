@@ -4,7 +4,7 @@ pragma solidity 0.8.36;
 // Remix copy — modified from contracts/interfaces/ReceiverTemplate.sol.
 // Difference: owner pattern is inlined (no Ownable import) so this file is
 // compatible with AccessControl inheritance without C3 linearization conflicts.
-// Load this file before TObserverFunds.sol and TObserver.sol.
+// Load this file before TObserverFund.sol and TObserver.sol.
 
 import "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 
@@ -14,7 +14,6 @@ interface IReceiver is IERC165 {
 
 /// @title ReceiverTemplate — abstract receiver with optional permission controls
 /// @notice Provides flexible, updatable security checks for receiving workflow reports.
-///         Source: https://github.com/tigeragentt/cre-world-cup-prediction-market/blob/main/contracts/interfaces/ReceiverTemplate.sol
 abstract contract ReceiverTemplate is IReceiver {
     // ─── Inlined owner (no Ownable import — avoids Context conflict with AccessControl)
 

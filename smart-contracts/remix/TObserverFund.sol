@@ -2,15 +2,15 @@
 pragma solidity 0.8.36;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import {IObserverFunds} from "./IObserverFunds.sol";
+import {IObserverFund} from "./IObserverFund.sol";
 
 /**
- * @title TObserverFunds
+ * @title TObserverFund
  * @notice Standalone FIDC fund registry (Remix/testnet version).
  *         Deploy first; pass this address to TObserver.
- *         Implements IObserverFunds.
+ *         Implements IObserverFund.
  */
-contract TObserverFunds is AccessControl, IObserverFunds {
+contract TObserverFund is AccessControl, IObserverFund {
 
     // ─── Errors ─────────────────────────────────────────────────────────────
 

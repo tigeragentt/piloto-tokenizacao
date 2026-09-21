@@ -11,17 +11,17 @@
 Load files in this order so imports resolve correctly:
 
 1. `ReceiverTemplate.sol`
-2. `IObserverFunds.sol`
-3. `TObserverFunds.sol`
+2. `IObserverFund.sol`
+3. `TObserverFund.sol`
 4. `TObserver.sol`
 
 Apply the compiler settings above before compiling.
 
 ## Deploy order
 
-1. Deploy **TObserverFunds** — no constructor args; deployer gets `DEFAULT_ADMIN_ROLE` + `ADMIN_ROLE`
-2. Copy the `TObserverFunds` deployed address
-3. Deploy **TObserver(_fund)** — paste the `TObserverFunds` address
+1. Deploy **TObserverFund** — no constructor args; deployer gets `DEFAULT_ADMIN_ROLE` + `ADMIN_ROLE`
+2. Copy the `TObserverFund` deployed address
+3. Deploy **TObserver(_fund)** — paste the `TObserverFund` address
 
 ## Notes
 

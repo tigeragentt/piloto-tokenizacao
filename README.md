@@ -42,8 +42,8 @@ smart-contracts/
     ObserverFund.sol     Standalone FIDC fund registry (deployed separately)
     interfaces/          ReceiverTemplate.sol, IReceiver
   remix/                 Testnet/Remix versions (T-prefix, independent versioning)
-    IObserverFunds.sol   Interface — single source of truth for fund structs
-    TObserverFunds.sol   v1.1.0 — AccessControl, implements IObserverFunds
+    IObserverFund.sol   Interface — single source of truth for fund structs
+    TObserverFund.sol   v1.1.0 — AccessControl, implements IObserverFund
     TObserver.sol        v1.2.0 — ReceiverTemplate + fundId in structs
     ReceiverTemplate.sol Flat copy for Remix (no imports needed)
     ObserverTestV1.sol   v1.0.0 — original monolithic contract, kept for comparison
@@ -188,22 +188,22 @@ The `smart-contracts/remix/` folder contains testnet versions with independent v
 
 | File | Version | Key differences from production |
 |---|---|---|
-| `TObserverFunds.sol` | 1.1.0 | `AccessControl` (ADMIN_ROLE); implements `IObserverFunds` |
+| `TObserverFund.sol` | 1.1.0 | `AccessControl` (ADMIN_ROLE); implements `IObserverFund` |
 | `TObserver.sol` | 1.2.0 | `fundId` as first field in `SettlementInput` and `ActionRecord`; hardcoded simulation forwarder; public write functions |
-| `IObserverFunds.sol` | — | Interface; defines `FundInput`/`FundInfo` structs |
+| `IObserverFund.sol` | — | Interface; defines `FundInput`/`FundInfo` structs |
 | `ObserverTestV1.sol` | 1.0.0 | Original monolithic contract — no CRE receiver, no fund split; kept for reference |
 
-**Load order in Remix:** `ReceiverTemplate.sol` → `IObserverFunds.sol` → `TObserverFunds.sol` → `TObserver.sol`
+**Load order in Remix:** `ReceiverTemplate.sol` → `IObserverFund.sol` → `TObserverFund.sol` → `TObserver.sol`
 
 **Deploy order:**
-1. Deploy `TObserverFunds` — no args; deployer gets `DEFAULT_ADMIN_ROLE` + `ADMIN_ROLE`
-2. Deploy `TObserver(_fund)` — paste the `TObserverFunds` address
+1. Deploy `TObserverFund` — no args; deployer gets `DEFAULT_ADMIN_ROLE` + `ADMIN_ROLE`
+2. Deploy `TObserver(_fund)` — paste the `TObserverFund` address
 
 ### Test sequence in Remix
 
 Connect MetaMask to Sepolia, then run in order:
 
-**1. registerFund (on TObserverFunds)**
+**1. registerFund (on TObserverFund)**
 
 ```
 ["be6f2e8a-5474-43c7-a692-7918c37e3f42","Horizonte Crédito Multirrede FIDC — Piloto XDC","eip155:51","0x0000000000000000000000000000000000000001","0x0000000000000000000000000000000000000002","0x0000000000000000000000000000000000000003","xrpl:testnet","rTestIssuerXXXXXXXXXXXXXXXXXXXXXXXXXX","CVD"]
@@ -240,8 +240,8 @@ setForwarderAddress(0x15fC6ae953E024d975e77382eEeC56A9101f9F88)  // restore
 | TObserver | `isOrderAnchored` | `"test-order-0001-ready-to-anchor"` | `true` |
 | TObserver | `getSettlementCount` | — | count |
 | TObserver | `getForwarderAddress` | — | current forwarder |
-| TObserverFunds | `getFundCount` | — | `1` |
-| TObserverFunds | `getFundById` | `"be6f2e8a-5474-43c7-a692-7918c37e3f42"` | full FundInfo |
+| TObserverFund | `getFundCount` | — | `1` |
+| TObserverFund | `getFundById` | `"be6f2e8a-5474-43c7-a692-7918c37e3f42"` | full FundInfo |
 
 > See `test/remix-inputs.md` for complete copy-paste tuples for all test calls.
 

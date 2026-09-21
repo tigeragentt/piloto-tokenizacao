@@ -1,17 +1,17 @@
-# Remix Test Inputs — TObserverFunds / TObserver
+# Remix Test Inputs — TObserverFund / TObserver
 
 Copy-paste values to test the deployed contracts in the Remix UI.
 All values are from `fixtures.json` so they match what the mock server serves.
 
-**Load order in Remix:** `ReceiverTemplate.sol` → `IObserverFunds.sol` → `TObserverFunds.sol` → `TObserver.sol`
+**Load order in Remix:** `ReceiverTemplate.sol` → `IObserverFund.sol` → `TObserverFund.sol` → `TObserver.sol`
 
 **Deploy order:**
-1. Deploy `TObserverFunds` — no args; deployer gets `ADMIN_ROLE`
-2. Deploy `TObserver(_fund)` — paste the `TObserverFunds` address
+1. Deploy `TObserverFund` — no args; deployer gets `ADMIN_ROLE`
+2. Deploy `TObserver(_fund)` — paste the `TObserverFund` address
 
 ---
 
-## 1. registerFund (on TObserverFunds)
+## 1. registerFund (on TObserverFund)
 
 Paste this tuple into the `f` parameter of `registerFund`:
 
@@ -117,7 +117,7 @@ reportAction(
 
 ## 6. View calls to verify
 
-All settlement/action reads are on **TObserver**; fund reads are on **TObserverFunds**.
+All settlement/action reads are on **TObserver**; fund reads are on **TObserverFund**.
 
 | Contract | Function | Input | Expected |
 |---|---|---|---|
@@ -126,14 +126,14 @@ All settlement/action reads are on **TObserver**; fund reads are on **TObserverF
 | TObserver | `getSettlementCount` | — | number of anchored settlements |
 | TObserver | `getLatestSettlement` | `0xaabb...0001` | full SettlementRecord |
 | TObserver | `getSettlement` | `0` | first record |
-| TObserverFunds | `getFundCount` | — | `1` after registerFund |
-| TObserverFunds | `getFundById` | `"be6f2e8a-5474-43c7-a692-7918c37e3f42"` | full FundInfo |
+| TObserverFund | `getFundCount` | — | `1` after registerFund |
+| TObserverFund | `getFundById` | `"be6f2e8a-5474-43c7-a692-7918c37e3f42"` | full FundInfo |
 
 ---
 
 ## Notes
 
-- Use `TObserverFunds.sol` for fund management (separate contract from TObserver)
+- Use `TObserverFund.sol` for fund management (separate contract from TObserver)
 - Use `TObserver.sol` for settlement and action records
 - `fundId` (Capitare fund UUID) is now the **first field** in every `SettlementInput` and `ActionRecord` tuple
 - `TObserver` reverts with `FundNotRegistered` if you call `reportSettlement` before `registerFund`
