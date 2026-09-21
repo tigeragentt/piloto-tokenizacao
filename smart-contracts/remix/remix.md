@@ -84,6 +84,13 @@ setForwarderAddress(0x15fC6ae953E024d975e77382eEeC56A9101f9F88)  // restore
 
 > See `test/remix-inputs.md` for complete copy-paste tuples for all test calls.
 
+## Deployed addresses (Sepolia)
+
+| Contract | Address |
+|---|---|
+| TObserverFund | `0x8f6bc1DC54975a15aC90Eb24106F12e2B703aEa4` |
+| TObserver | `0x6cd2D719bb3170a04ab69fee92c6E9659AAd7757` |
+
 ## Forwarder addresses
 
 | Network | Address |
