@@ -31,13 +31,14 @@ contract Observer is ReceiverTemplate {
 
     error ActionAlreadyAnchored();
     error OrderAlreadyAnchored();
+    error FundNotRegistered();
     error NotFound();
     error InvalidRange();
     error OutOfBounds();
 
     // ─── Constants ───────────────────────────────────────────────────────────
 
-    string public constant VERSION = "1.5.0";
+    string public constant VERSION = "1.6.0";
 
     // ─── Fund reference ───────────────────────────────────────────────────────
 
@@ -63,6 +64,7 @@ contract Observer is ReceiverTemplate {
     }
 
     struct ActionRecord {
+        string     fundId;     // Capitare fund UUID — links action to its FIDC fund
         string     network;
         ActionType action;
         string     from;
@@ -74,11 +76,13 @@ contract Observer is ReceiverTemplate {
     }
 
     ActionRecord[]           private _actions;
-    mapping(bytes32 => bool) private _txAnchored;   // keccak256(network ++ txHash) → seen
+    mapping(bytes32 => bool) private _txAnchored;      // keccak256(network ++ txHash) → seen
+    mapping(string => uint256[]) private _fundActions; // fundId → action record IDs
 
     // ─── Settlement Records ──────────────────────────────────────────────────
 
     struct SettlementInput {
+        string   fundId;            // Capitare fund UUID
         string   orderId;
         bytes32  intentHash;
         string   progress;
@@ -91,6 +95,7 @@ contract Observer is ReceiverTemplate {
     }
 
     struct SettlementRecord {
+        string   fundId;               // Capitare fund UUID — links order to its FIDC fund
         string   orderId;              // Capitare order UUID
         bytes32  intentHash;           // cross-chain correlation key (= XRPL InvoiceID)
         string   progress;             // Capitare progress state at time of anchoring
@@ -105,7 +110,8 @@ contract Observer is ReceiverTemplate {
     }
 
     SettlementRecord[]       private _settlements;
-    mapping(string => bool)  private _orderAnchored;   // orderId → seen
+    mapping(string => bool)  private _orderAnchored;         // orderId → seen
+    mapping(string => uint256[]) private _fundSettlements;   // fundId → settlement record IDs
 
     // intentHash → 1-based index into _settlements (workflow lookup key)
     mapping(bytes32 => uint256) public latestSettlementId;
@@ -116,6 +122,7 @@ contract Observer is ReceiverTemplate {
         uint256    indexed recordId,
         string     indexed network,
         string     indexed txHash,
+        string             fundId,
         ActionType         action,
         string             from,
         string             to,
@@ -127,6 +134,7 @@ contract Observer is ReceiverTemplate {
         uint256 indexed recordId,
         string  indexed orderId,
         bytes32 indexed intentHash,
+        string          fundId,
         string          progress,
         bool            technicalCompleted,
         bool            accountingCompleted,
@@ -148,6 +156,7 @@ contract Observer is ReceiverTemplate {
     // ─── Direct write path (onlyOwner — bypass CRE for admin / recovery) ─────
 
     function reportAction(
+        string     calldata fundId,
         string     calldata network,
         ActionType          action,
         string     calldata from,
@@ -155,17 +164,19 @@ contract Observer is ReceiverTemplate {
         uint256             amount,
         string     calldata txHash
     ) external onlyOwner returns (uint256 recordId) {
+        if (!fund.isFundRegistered(fundId)) revert FundNotRegistered();
         bytes32 txKey = keccak256(abi.encodePacked(network, txHash));
         if (_txAnchored[txKey]) revert ActionAlreadyAnchored();
         _txAnchored[txKey] = true;
         recordId = _actions.length;
         _actions.push(ActionRecord({
-            network: network, action: action,
+            fundId: fundId, network: network, action: action,
             from: from, to: to,
             amount: amount, txHash: txHash,
             timestamp: block.timestamp, blockNumber: block.number
         }));
-        emit ActionReported(recordId, network, txHash, action, from, to, amount, block.timestamp);
+        _fundActions[fundId].push(recordId);
+        emit ActionReported(recordId, network, txHash, fundId, action, from, to, amount, block.timestamp);
     }
 
     function reportSettlement(SettlementInput calldata s) external onlyOwner returns (uint256 recordId) {
@@ -182,10 +193,12 @@ contract Observer is ReceiverTemplate {
     }
 
     function _reportSettlement(SettlementInput memory s) internal returns (uint256 recordId) {
+        if (!fund.isFundRegistered(s.fundId)) revert FundNotRegistered();
         if (_orderAnchored[s.orderId]) revert OrderAlreadyAnchored();
         _orderAnchored[s.orderId] = true;
         recordId = _settlements.length;
         _settlements.push(SettlementRecord({
+            fundId:              s.fundId,
             orderId:             s.orderId,
             intentHash:          s.intentHash,
             progress:            s.progress,
@@ -198,9 +211,10 @@ contract Observer is ReceiverTemplate {
             reportedAt:          block.timestamp,
             blockNumber:         block.number
         }));
+        _fundSettlements[s.fundId].push(recordId);
         latestSettlementId[s.intentHash] = recordId + 1;
         emit SettlementReported(
-            recordId, s.orderId, s.intentHash, s.progress,
+            recordId, s.orderId, s.intentHash, s.fundId, s.progress,
             s.technicalCompleted, s.accountingCompleted,
             s.deliveryProofSHA256, s.resolutionHash, block.timestamp
         );
@@ -252,6 +266,11 @@ contract Observer is ReceiverTemplate {
         for (uint256 i = 0; i < n; i++) result[i] = _settlements[fromIndex + i];
     }
 
+    /// @notice Returns all settlement record IDs anchored for a given fund.
+    function getSettlementsByFund(string calldata fundId) external view returns (uint256[] memory) {
+        return _fundSettlements[fundId];
+    }
+
     // ─── Action Views ─────────────────────────────────────────────────────────
 
     function getActionCount() external view returns (uint256) {
@@ -276,5 +295,10 @@ contract Observer is ReceiverTemplate {
         uint256 n = toIndex - fromIndex + 1;
         result = new ActionRecord[](n);
         for (uint256 i = 0; i < n; i++) result[i] = _actions[fromIndex + i];
+    }
+
+    /// @notice Returns all action record IDs anchored for a given fund.
+    function getActionsByFund(string calldata fundId) external view returns (uint256[] memory) {
+        return _fundActions[fundId];
     }
 }

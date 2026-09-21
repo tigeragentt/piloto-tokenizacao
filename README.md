@@ -38,13 +38,13 @@ escrow proxy (per-order, EIP-1167)
 ```
 smart-contracts/
   contracts/
-    Observer.sol         v1.5.0 — settlement/action proof registry, ReceiverTemplate
+    Observer.sol         v1.6.0 — settlement/action proof registry, ReceiverTemplate; fundId in all structs
     ObserverFund.sol     Standalone FIDC fund registry (deployed separately)
     interfaces/          ReceiverTemplate.sol, IReceiver
   remix/                 Testnet/Remix versions (T-prefix, independent versioning)
     IObserverFund.sol   Interface — single source of truth for fund structs
     TObserverFund.sol   v1.1.0 — AccessControl, implements IObserverFund
-    TObserver.sol        v1.2.0 — ReceiverTemplate + fundId in structs
+    TObserver.sol        v1.3.0 — ReceiverTemplate + AccessControl; fundId in all structs
     ReceiverTemplate.sol Flat copy for Remix (no imports needed)
     ObserverTestV1.sol   v1.0.0 — original monolithic contract, kept for comparison
 workflow-capitare/       CRE workflow: polls Capitare API, anchors proofs on-chain

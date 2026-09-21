@@ -176,6 +176,7 @@ const anchorSettlement = (
       {
         type: "tuple",
         components: [
+          { name: "fundId",              type: "string"  },
           { name: "orderId",             type: "string"  },
           { name: "intentHash",          type: "bytes32" },
           { name: "progress",            type: "string"  },
@@ -190,6 +191,7 @@ const anchorSettlement = (
     ] as const,
     [
       {
+        fundId:              runtime.config.fundId,
         orderId:             order.id,
         intentHash:          intentHashBytes32,
         progress:            order.progress,

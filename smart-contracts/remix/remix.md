@@ -15,7 +15,7 @@
 | `ReceiverTemplate.sol` | — | Remix-only copy; inlines owner pattern (no Ownable import) for AccessControl compatibility |
 | `IObserverFund.sol` | — | Interface; defines `FundInput` / `FundInfo` structs |
 | `TObserverFund.sol` | 1.1.0 | `AccessControl` (ADMIN_ROLE); implements `IObserverFund` |
-| `TObserver.sol` | 1.2.0 | `ReceiverTemplate + AccessControl`; hardcoded simulation forwarder; public write functions |
+| `TObserver.sol` | 1.3.0 | `ReceiverTemplate + AccessControl`; hardcoded simulation forwarder; public write functions; fundId in all structs |
 | `ObserverTestV1.sol` | 1.0.0 | Original monolithic contract — no CRE receiver, no fund split; kept for reference |
 
 ## Load order in Remix

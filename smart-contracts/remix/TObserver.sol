@@ -7,7 +7,7 @@ import {IObserverFund} from "./IObserverFund.sol";
 
 /**
  * @title TObserver
- * @notice Remix-only deploy target — mirrors Observer.sol v1.5.0 exactly but:
+ * @notice Remix-only deploy target — mirrors Observer.sol v1.6.0 exactly but:
  *           1. Constructor takes (_fundAddress) and uses the simulation forwarder
  *           2. reportSettlement() and reportAction() are public (no role check)
  *         Do NOT deploy this to production. Use contracts/Observer.sol instead.
@@ -18,14 +18,17 @@ import {IObserverFund} from "./IObserverFund.sol";
 contract TObserver is ReceiverTemplate, AccessControl {
 
     // ─── Errors ─────────────────────────────────────────────────────────────
+
     error ActionAlreadyAnchored();
     error OrderAlreadyAnchored();
+    error FundNotRegistered();
     error NotFound();
     error InvalidRange();
     error OutOfBounds();
 
     // ─── Constants ───────────────────────────────────────────────────────────
-    string public constant VERSION = "1.2.0";
+
+    string public constant VERSION = "1.3.0";
     bytes32 public constant ADMIN_ROLE    = keccak256("ADMIN_ROLE");
     bytes32 public constant REPORTER_ROLE = keccak256("REPORTER_ROLE");
 
@@ -35,10 +38,11 @@ contract TObserver is ReceiverTemplate, AccessControl {
     address private constant SIMULATION_FORWARDER = 0x15fC6ae953E024d975e77382eEeC56A9101f9F88;
 
     // ─── Fund reference ───────────────────────────────────────────────────────
+
     IObserverFund public funds;
 
-
     // ─── General Action Log ──────────────────────────────────────────────────
+
     enum ActionType {
         Transfer,              // 0  BRL-CVM ERC-20 transfer on XDC
         Mint,                  // 1
@@ -57,6 +61,7 @@ contract TObserver is ReceiverTemplate, AccessControl {
     }
 
     struct ActionRecord {
+        string     fundId;     // Capitare fund UUID — links action to its FIDC fund
         string     network;
         ActionType action;
         string     from;
@@ -68,11 +73,13 @@ contract TObserver is ReceiverTemplate, AccessControl {
     }
 
     ActionRecord[]           private _actions;
-    mapping(bytes32 => bool) private _txAnchored;   // keccak256(network ++ txHash) → seen
+    mapping(bytes32 => bool) private _txAnchored;      // keccak256(network ++ txHash) → seen
+    mapping(string => uint256[]) private _fundActions; // fundId → action record IDs
 
     // ─── Settlement Records ──────────────────────────────────────────────────
 
     struct SettlementInput {
+        string   fundId;            // Capitare fund UUID
         string   orderId;
         bytes32  intentHash;
         string   progress;
@@ -85,6 +92,7 @@ contract TObserver is ReceiverTemplate, AccessControl {
     }
 
     struct SettlementRecord {
+        string   fundId;               // Capitare fund UUID — links order to its FIDC fund
         string   orderId;              // Capitare order UUID
         bytes32  intentHash;           // cross-chain correlation key (= XRPL InvoiceID)
         string   progress;             // Capitare progress state at time of anchoring
@@ -99,7 +107,8 @@ contract TObserver is ReceiverTemplate, AccessControl {
     }
 
     SettlementRecord[]       private _settlements;
-    mapping(string => bool)  private _orderAnchored;   // orderId → seen
+    mapping(string => bool)  private _orderAnchored;         // orderId → seen
+    mapping(string => uint256[]) private _fundSettlements;   // fundId → settlement record IDs
 
     // intentHash → 1-based index into _settlements (workflow lookup key)
     mapping(bytes32 => uint256) public latestSettlementId;
@@ -110,6 +119,7 @@ contract TObserver is ReceiverTemplate, AccessControl {
         uint256    indexed recordId,
         string     indexed network,
         string     indexed txHash,
+        string             fundId,
         ActionType         action,
         string             from,
         string             to,
@@ -121,6 +131,7 @@ contract TObserver is ReceiverTemplate, AccessControl {
         uint256 indexed recordId,
         string  indexed orderId,
         bytes32 indexed intentHash,
+        string          fundId,
         string          progress,
         bool            technicalCompleted,
         bool            accountingCompleted,
@@ -131,8 +142,6 @@ contract TObserver is ReceiverTemplate, AccessControl {
 
     // ─── Constructor ─────────────────────────────────────────────────────────
 
-    // Deploys its own ObserverFund for Remix convenience.
-    // Call fund() to get the ObserverFund address, then use it directly.
     constructor(address _fundAddress) ReceiverTemplate(SIMULATION_FORWARDER) {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(ADMIN_ROLE, msg.sender);
@@ -140,9 +149,10 @@ contract TObserver is ReceiverTemplate, AccessControl {
         funds = IObserverFund(_fundAddress);
     }
 
-    // ─── Reporter ───────────────────────────────────────────────────────────
+    // ─── Reporter ────────────────────────────────────────────────────────────
 
     function reportAction(
+        string     calldata fundId,
         string     calldata network,
         ActionType          action,
         string     calldata from,
@@ -150,17 +160,19 @@ contract TObserver is ReceiverTemplate, AccessControl {
         uint256             amount,
         string     calldata txHash
     ) external returns (uint256 recordId) {
+        if (!funds.isFundRegistered(fundId)) revert FundNotRegistered();
         bytes32 txKey = keccak256(abi.encodePacked(network, txHash));
         if (_txAnchored[txKey]) revert ActionAlreadyAnchored();
         _txAnchored[txKey] = true;
         recordId = _actions.length;
         _actions.push(ActionRecord({
-            network: network, action: action,
+            fundId: fundId, network: network, action: action,
             from: from, to: to,
             amount: amount, txHash: txHash,
             timestamp: block.timestamp, blockNumber: block.number
         }));
-        emit ActionReported(recordId, network, txHash, action, from, to, amount, block.timestamp);
+        _fundActions[fundId].push(recordId);
+        emit ActionReported(recordId, network, txHash, fundId, action, from, to, amount, block.timestamp);
     }
 
     function reportSettlement(SettlementInput calldata s) external returns (uint256 recordId) {
@@ -168,16 +180,19 @@ contract TObserver is ReceiverTemplate, AccessControl {
     }
 
     // ─── ReceiverTemplate — CRE write path ───────────────────────────────────
+
     function _processReport(bytes calldata report) internal override {
         SettlementInput memory s = abi.decode(report, (SettlementInput));
         _reportSettlement(s);
     }
 
     function _reportSettlement(SettlementInput memory s) internal returns (uint256 recordId) {
+        if (!funds.isFundRegistered(s.fundId)) revert FundNotRegistered();
         if (_orderAnchored[s.orderId]) revert OrderAlreadyAnchored();
         _orderAnchored[s.orderId] = true;
         recordId = _settlements.length;
         _settlements.push(SettlementRecord({
+            fundId:              s.fundId,
             orderId:             s.orderId,
             intentHash:          s.intentHash,
             progress:            s.progress,
@@ -190,15 +205,17 @@ contract TObserver is ReceiverTemplate, AccessControl {
             reportedAt:          block.timestamp,
             blockNumber:         block.number
         }));
+        _fundSettlements[s.fundId].push(recordId);
         latestSettlementId[s.intentHash] = recordId + 1;
         emit SettlementReported(
-            recordId, s.orderId, s.intentHash, s.progress,
+            recordId, s.orderId, s.intentHash, s.fundId, s.progress,
             s.technicalCompleted, s.accountingCompleted,
             s.deliveryProofSHA256, s.resolutionHash, block.timestamp
         );
     }
 
     // ─── ERC165 ───────────────────────────────────────────────────────────────
+
     function supportsInterface(bytes4 interfaceId) public view override(AccessControl, ReceiverTemplate) returns (bool) {
         return AccessControl.supportsInterface(interfaceId) || ReceiverTemplate.supportsInterface(interfaceId);
     }
@@ -247,6 +264,11 @@ contract TObserver is ReceiverTemplate, AccessControl {
         for (uint256 i = 0; i < n; i++) result[i] = _settlements[fromIndex + i];
     }
 
+    /// @notice Returns all settlement record IDs anchored for a given fund.
+    function getSettlementsByFund(string calldata fundId) external view returns (uint256[] memory) {
+        return _fundSettlements[fundId];
+    }
+
     // ─── Action Views ─────────────────────────────────────────────────────────
 
     function getActionCount() external view returns (uint256) { return _actions.length; }
@@ -269,5 +291,10 @@ contract TObserver is ReceiverTemplate, AccessControl {
         uint256 n = toIndex - fromIndex + 1;
         result = new ActionRecord[](n);
         for (uint256 i = 0; i < n; i++) result[i] = _actions[fromIndex + i];
+    }
+
+    /// @notice Returns all action record IDs anchored for a given fund.
+    function getActionsByFund(string calldata fundId) external view returns (uint256[] memory) {
+        return _fundActions[fundId];
     }
 }
