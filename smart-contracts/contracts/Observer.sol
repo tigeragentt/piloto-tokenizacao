@@ -50,7 +50,7 @@ contract Observer is ReceiverTemplate {
         Mint,                  // 1
         Burn,                  // 2
         Approve,               // 3
-        FIDCCreated,           // 4  FIDC fund created on XDC
+        FIDCFundCreated,       // 4  FIDC fund created on XDC
         Invested,              // 5  quota investment
         EscrowCreated,         // 6  EIP-1167 escrow proxy deployed
         Whitelisted,           // 7  address added to custody or payment whitelist
