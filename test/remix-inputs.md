@@ -99,19 +99,21 @@ Check after:
 
 ## 5. reportAction (on TObserver)
 
-`fundId` is the first parameter:
+`reportAction` takes an `ActionInput` tuple (same pattern as `SettlementInput`). Paste into the `a` parameter:
 
 ```
-reportAction(
-  "be6f2e8a-5474-43c7-a692-7918c37e3f42",   // fundId
-  "eip155:51",                                // network
-  0,                                          // ActionType.Transfer
+[
+  "be6f2e8a-5474-43c7-a692-7918c37e3f42",
+  "eip155:51",
+  0,
   "0x0000000000000000000000000000000000000001",
   "0x0000000000000000000000000000000000000002",
-  1000000000000000000,                        // 1 token (18 decimals)
+  1000000000000000000,
   "0xdeadbeef000000000000000000000000000000000000000000000000deadbeef"
-)
+]
 ```
+
+Fields: `fundId, network, action (uint8), from, to, amount, txHash`
 
 ---
 

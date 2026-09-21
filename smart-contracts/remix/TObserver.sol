@@ -28,7 +28,7 @@ contract TObserver is ReceiverTemplate, AccessControl {
 
     // ─── Constants ───────────────────────────────────────────────────────────
 
-    string public constant VERSION = "1.3.0";
+    string public constant VERSION = "1.4.0";
     bytes32 public constant ADMIN_ROLE    = keccak256("ADMIN_ROLE");
     bytes32 public constant REPORTER_ROLE = keccak256("REPORTER_ROLE");
 
@@ -58,6 +58,16 @@ contract TObserver is ReceiverTemplate, AccessControl {
         DeliveryProofAnchored, // 11 delivery proof SHA256 anchored
         SettlementProofAnchored, // 12 full settlement proof anchored
         Divergence             // 13 cross-chain mismatch detected
+    }
+
+    struct ActionInput {
+        string     fundId;
+        string     network;
+        ActionType action;
+        string     from;
+        string     to;
+        uint256    amount;
+        string     txHash;
     }
 
     struct ActionRecord {
@@ -151,28 +161,20 @@ contract TObserver is ReceiverTemplate, AccessControl {
 
     // ─── Reporter ────────────────────────────────────────────────────────────
 
-    function reportAction(
-        string     calldata fundId,
-        string     calldata network,
-        ActionType          action,
-        string     calldata from,
-        string     calldata to,
-        uint256             amount,
-        string     calldata txHash
-    ) external returns (uint256 recordId) {
-        if (!funds.isFundRegistered(fundId)) revert FundNotRegistered();
-        bytes32 txKey = keccak256(abi.encodePacked(network, txHash));
+    function reportAction(ActionInput calldata a) external returns (uint256 recordId) {
+        if (!funds.isFundRegistered(a.fundId)) revert FundNotRegistered();
+        bytes32 txKey = keccak256(abi.encodePacked(a.network, a.txHash));
         if (_txAnchored[txKey]) revert ActionAlreadyAnchored();
         _txAnchored[txKey] = true;
         recordId = _actions.length;
         _actions.push(ActionRecord({
-            fundId: fundId, network: network, action: action,
-            from: from, to: to,
-            amount: amount, txHash: txHash,
+            fundId: a.fundId, network: a.network, action: a.action,
+            from: a.from, to: a.to,
+            amount: a.amount, txHash: a.txHash,
             timestamp: block.timestamp, blockNumber: block.number
         }));
-        _fundActions[fundId].push(recordId);
-        emit ActionReported(recordId, network, txHash, fundId, action, from, to, amount, block.timestamp);
+        _fundActions[a.fundId].push(recordId);
+        emit ActionReported(recordId, a.network, a.txHash, a.fundId, a.action, a.from, a.to, a.amount, block.timestamp);
     }
 
     function reportSettlement(SettlementInput calldata s) external returns (uint256 recordId) {
