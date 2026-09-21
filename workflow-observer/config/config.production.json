@@ -1,6 +1,6 @@
 {
-  "capitareBaseUrl": "https://TODO_PRODUCTION_CAPITARE_URL/v1/external/observer",
-  "capitareClientId": "TODO_PRODUCTION_CLIENT_ID",
+  "apiBaseUrl": "https://TODO_PRODUCTION_API_URL/v1/external/observer",
+  "apiClientId": "TODO_PRODUCTION_CLIENT_ID",
   "fundId": "TODO_PRODUCTION_FUND_ID",
   "schedule": "0 */5 * * * *",
   "chainSelectorName": "ethereum-testnet-sepolia",

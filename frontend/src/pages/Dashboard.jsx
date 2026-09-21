@@ -3,8 +3,8 @@ import { ethers } from 'ethers'
 import { OBSERVER_ABI } from '../abi.js'
 import {
   SEPOLIA_RPC, OBSERVER_ADDRESS,
-  CAPITARE_FUND_ID, XDC_FIDC_MANAGER, XDC_STABLE, XDC_ESCROW_FACTORY,
-  capitareGet, formatTimestamp, shortHash, isZeroBytes32,
+  FUND_ID, XDC_FIDC_MANAGER, XDC_STABLE, XDC_ESCROW_FACTORY,
+  apiGet, formatTimestamp, shortHash, isZeroBytes32,
   sepoliaBlockUrl,
 } from '../config.js'
 import StatusBadge, { BoolBadge } from '../components/StatusBadge.jsx'
@@ -26,7 +26,7 @@ async function fetchObserverSummary() {
 }
 
 async function fetchOrderSummary() {
-  const data = await capitareGet(`/funds/${CAPITARE_FUND_ID}/debenture-orders`)
+  const data = await apiGet(`/funds/${FUND_ID}/debenture-orders`)
   const items = data.items || []
   const settled = items.filter(o => o.progress === 'ACQUIRED_WITH_LOCK').length
   return { total: items.length, settled, items: items.slice(0, 3) }
@@ -131,7 +131,7 @@ export default function Dashboard() {
           <table className="info-table">
             <tbody>
               <tr><td>Fund</td><td>Horizonte Crédito Multirrede FIDC — Piloto XDC</td></tr>
-              <tr><td>Fund ID</td><td style={{ fontFamily: 'monospace', fontSize: 11 }}>{CAPITARE_FUND_ID.slice(0, 18)}…</td></tr>
+              <tr><td>Fund ID</td><td style={{ fontFamily: 'monospace', fontSize: 11 }}>{FUND_ID.slice(0, 18)}…</td></tr>
               <tr><td>FIDC Manager (XDC)</td><td style={{ fontFamily: 'monospace', fontSize: 11 }}>{XDC_FIDC_MANAGER}</td></tr>
               <tr><td>BRL-CVM Stable (XDC)</td><td style={{ fontFamily: 'monospace', fontSize: 11 }}>{XDC_STABLE}</td></tr>
               <tr><td>Escrow Factory (XDC)</td><td style={{ fontFamily: 'monospace', fontSize: 11 }}>{XDC_ESCROW_FACTORY}</td></tr>

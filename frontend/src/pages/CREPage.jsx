@@ -156,8 +156,8 @@ export default function CREPage() {
           lineHeight: 1.7,
         }}>
 {`{
-  "capitareBaseUrl": "https://dev-api-mercado-bitcoin.web3up.mobi/v1/external/observer",
-  "capitareClientId": "mb-observer-demo",
+  "apiBaseUrl": "https://dev-api-mercado-bitcoin.web3up.mobi/v1/external/observer",
+  "apiClientId": "mb-observer-demo",
   "fundId": "be6f2e8a-5474-43c7-a692-7918c37e3f42",
   "schedule": "0 */2 * * * *",
   "sepoliaRpcUrl": "https://ethereum-sepolia-rpc.publicnode.com",

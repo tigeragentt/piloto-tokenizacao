@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { ethers } from 'ethers'
 import { OBSERVER_ABI } from '../abi.js'
 import {
-  CAPITARE_FUND_ID, capitareGet, getCapitareKey,
+  FUND_ID, apiGet, getApiKey,
   OBSERVER_ADDRESS, SEPOLIA_RPC, SEPOLIA_NETWORK_PARAMS,
   shortHash, sepoliaTxUrl,
 } from '../config.js'
@@ -30,13 +30,13 @@ export default function CapitarePage() {
   const [anchoringId, setAnchoringId] = useState(null)
   const [txs, setTxs] = useState({})   // orderId → txHash
 
-  const apiKey = getCapitareKey()
+  const apiKey = getApiKey()
 
   async function loadAll() {
     setLoading(true)
     setError(null)
     try {
-      const data = await capitareGet(`/funds/${CAPITARE_FUND_ID}/debenture-orders`)
+      const data = await apiGet(`/funds/${FUND_ID}/debenture-orders`)
       const orders = data.items || []
 
       const enriched = await Promise.all(orders.map(async (order) => {
@@ -46,8 +46,8 @@ export default function CapitarePage() {
 
         if (order.settlementCompleted) {
           const [s, p] = await Promise.all([
-            capitareGet(`/funds/${CAPITARE_FUND_ID}/debenture-orders/${order.id}/settlement`).catch(() => null),
-            capitareGet(`/funds/${CAPITARE_FUND_ID}/debenture-orders/${order.id}/proof`).catch(() => null),
+            apiGet(`/funds/${FUND_ID}/debenture-orders/${order.id}/settlement`).catch(() => null),
+            apiGet(`/funds/${FUND_ID}/debenture-orders/${order.id}/proof`).catch(() => null),
           ])
           settlement = s
           proof = p

@@ -7,7 +7,7 @@
 //   node test/mock-server.js          (port 3001)
 //   PORT=4000 node test/mock-server.js
 //
-// Then set CAPITARE_BASE_URL=http://localhost:3001/v1/external/observer
+// Then set API_BASE_URL=http://localhost:3001/v1/external/observer
 // in .env and use config.test.json for cre workflow simulate.
 
 const http = require('http')
@@ -71,6 +71,6 @@ server.listen(PORT, () => {
   console.log(`  Settlement: GET http://localhost:${PORT}/v1/external/observer/funds/${FUND_ID}/debenture-orders/{orderId}/settlement`)
   console.log(`  Proof:      GET http://localhost:${PORT}/v1/external/observer/funds/${FUND_ID}/debenture-orders/{orderId}/proof`)
   console.log(``)
-  console.log(`For CRE simulate: cre workflow simulate workflow-capitare --target test-settings --non-interactive --trigger-index 0`)
-  console.log(`For frontend:     VITE_CAPITARE_MOCK=true npm run dev  (or set CAPITARE_BASE in .env.local)`)
+  console.log(`For CRE simulate: cre workflow simulate workflow-observer --target test-settings --non-interactive --trigger-index 0`)
+  console.log(`For frontend:     VITE_API_MOCK=true npm run dev  (or set API_BASE in .env.local)`)
 })

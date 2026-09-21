@@ -37,27 +37,27 @@ export const XDC_ESCROW_FACTORY = '0x5f6d0B7886858ac75c32b9642090067157651Ff4'
 
 // ─── Capitare API ─────────────────────────────────────────────────────────────
 
-export const CAPITARE_FUND_ID = 'be6f2e8a-5474-43c7-a692-7918c37e3f42'
-export const CAPITARE_CLIENT_ID = 'mb-observer-demo'
+export const FUND_ID = 'be6f2e8a-5474-43c7-a692-7918c37e3f42'
+export const API_CLIENT_ID = 'mb-observer-demo'
 
-// Dev API URL — proxied in dev via /capitare-api Vite proxy
+// Dev API URL — proxied in dev via /observer-api Vite proxy
 const isLocalhost = typeof window !== 'undefined' &&
   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-export const CAPITARE_API_BASE = isLocalhost
-  ? '/capitare-api'
+export const API_BASE = isLocalhost
+  ? '/observer-api'
   : 'https://dev-api-mercado-bitcoin.web3up.mobi/v1/external/observer'
 
 // API key stored in localStorage — never in the build
-export function getCapitareKey() {
-  return localStorage.getItem('api_observer_key') || import.meta.env.VITE_CAPITARE_KEY || ''
+export function getApiKey() {
+  return localStorage.getItem('api_observer_key') || import.meta.env.VITE_API_KEY || ''
 }
 
-export async function capitareGet(path) {
-  const key = getCapitareKey()
+export async function apiGet(path) {
+  const key = getApiKey()
   if (!key) throw new Error('Capitare API key not set. Paste it in the Orders page settings.')
-  const resp = await fetch(`${CAPITARE_API_BASE}${path}`, {
+  const resp = await fetch(`${API_BASE}${path}`, {
     headers: {
-      'X-Observer-Id': CAPITARE_CLIENT_ID,
+      'X-Observer-Id': API_CLIENT_ID,
       'X-Observer-Key': key,
     },
   })

@@ -26,8 +26,8 @@ import {
 } from "viem"
 
 export type Config = {
-  capitareBaseUrl: string   // e.g. "https://dev-api-mercado-bitcoin.web3up.mobi/v1/external/observer"
-  capitareClientId: string  // X-Observer-Id header value, e.g. "mb-observer-demo"
+  apiBaseUrl: string   // e.g. "https://dev-api-mercado-bitcoin.web3up.mobi/v1/external/observer"
+  apiClientId: string  // X-Observer-Id header value, e.g. "mb-observer-demo"
   fundId: string            // Capitare fund UUID
   schedule: string          // cron expression, e.g. "0 */2 * * * *"
   chainSelectorName: string // CRE chain selector name, e.g. "ethereum-testnet-sepolia"
@@ -81,7 +81,7 @@ type ScanResult = {
   errors: string[]
 }
 
-// Envelope returned by capitareGet — never null (CRE consensus can't wrap null)
+// Envelope returned by apiGet — never null (CRE consensus can't wrap null)
 type CapitareResult = { found: false } | { found: true; body: object }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -96,14 +96,14 @@ const ZERO_BYTES32: `0x${string}` = "0x00000000000000000000000000000000000000000
 
 // ─── Capitare API helpers ─────────────────────────────────────────────────────
 
-const capitareGet = (
+const apiGet = (
   runtime: Runtime<Config>,
   httpClient: HTTPClient,
   path: string,
   observerKey: string,
 ): CapitareResult => {
-  const { capitareBaseUrl, capitareClientId } = runtime.config
-  const url = `${capitareBaseUrl}${path}`
+  const { apiBaseUrl, apiClientId } = runtime.config
+  const url = `${apiBaseUrl}${path}`
   // Serialize to string — consensusIdenticalAggregation only reliably handles primitives
   const raw = httpClient.sendRequest(
     runtime,
@@ -112,7 +112,7 @@ const capitareGet = (
         url,
         method: "GET",
         headers: {
-          "X-Observer-Id": capitareClientId,
+          "X-Observer-Id": apiClientId,
           "X-Observer-Key": observerKey,
           "Accept": "application/json",
         },
@@ -249,7 +249,7 @@ const scanAndAnchor = async (runtime: Runtime<Config>): Promise<ScanResult> => {
   const observerKey = runtime.getSecret({ id: "api_observer_key" }).result().value as string
 
   runtime.log(`Fetching orders for fund ${fundId}`)
-  const ordersData = capitareGet(runtime, httpClient, `/funds/${fundId}/debenture-orders`, observerKey)
+  const ordersData = apiGet(runtime, httpClient, `/funds/${fundId}/debenture-orders`, observerKey)
   if (!ordersData.found) {
     runtime.log("No orders data (404) — fund not found or no orders yet")
     return result
@@ -282,7 +282,7 @@ const scanAndAnchor = async (runtime: Runtime<Config>): Promise<ScanResult> => {
       }
 
       runtime.log(`Order ${order.id}: fetching settlement proof`)
-      const settlementData = capitareGet(
+      const settlementData = apiGet(
         runtime, httpClient,
         `/funds/${fundId}/debenture-orders/${order.id}/settlement`,
         observerKey,

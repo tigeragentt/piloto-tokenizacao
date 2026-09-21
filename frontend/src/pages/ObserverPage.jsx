@@ -5,7 +5,7 @@ import {
   SEPOLIA_RPC, OBSERVER_ADDRESS, OBSERVER_FUND_ADDRESS,
   shortHash, isZeroBytes32, sepoliaBlockUrl,
   formatTimestamp,
-  CAPITARE_FUND_ID, XDC_FIDC_MANAGER, XDC_STABLE, XDC_ESCROW_FACTORY,
+  FUND_ID, XDC_FIDC_MANAGER, XDC_STABLE, XDC_ESCROW_FACTORY,
 } from '../config.js'
 import { useWallet } from '../context/WalletContext.jsx'
 import StatusBadge, { BoolBadge } from '../components/StatusBadge.jsx'
@@ -26,7 +26,7 @@ function ObserverNotDeployed() {
         <li>Deploy <strong>ObserverFund</strong> — no args (deployer becomes owner)</li>
         <li>Copy <code>ObserverFund</code> address</li>
         <li>Deploy <strong>Observer</strong> — pass <code>(forwarderAddress, observerFundAddress)</code></li>
-        <li>Set <code>observerAddress</code> in <code>workflow-capitare/config/config.staging.json</code></li>
+        <li>Set <code>observerAddress</code> in <code>workflow-observer/config/config.staging.json</code></li>
         <li>Add to <code>frontend/.env</code>:<br />
           <code>OBSERVER_ADDRESS=0x...</code><br />
           <code>OBSERVER_FUND_ADDRESS=0x...</code>
@@ -286,7 +286,7 @@ function AdminPanel({ signer }) {
 }
 
 const PILOT_FUND_VALUES = {
-  fundId:            CAPITARE_FUND_ID,
+  fundId:            FUND_ID,
   name:              'Horizonte Crédito Multirrede FIDC — Piloto XDC',
   xdcNetwork:        'eip155:51',
   xdcFidcManager:    XDC_FIDC_MANAGER,
@@ -308,7 +308,7 @@ function RegisterFundPanel({ signer }) {
     if (!OBSERVER_FUND_ADDRESS) return
     const ro = new ethers.JsonRpcProvider(SEPOLIA_RPC)
     const c  = new ethers.Contract(OBSERVER_FUND_ADDRESS, OBSERVER_FUND_ABI, ro)
-    c.isFundRegistered(CAPITARE_FUND_ID).then(registered => {
+    c.isFundRegistered(FUND_ID).then(registered => {
       if (registered) {
         setAlreadyRegistered(true)
         setForm(EMPTY_FUND)

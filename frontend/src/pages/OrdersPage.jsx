@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
-  CAPITARE_FUND_ID, capitareGet, getCapitareKey,
+  FUND_ID, apiGet, getApiKey,
   shortHash, isZeroBytes32, xrplTxUrl, xdcTxUrl, formatTimestamp,
 } from '../config.js'
 import StatusBadge, { BoolBadge } from '../components/StatusBadge.jsx'
@@ -19,8 +19,8 @@ function OrderDetail({ order, onClose }) {
     setProofErr(null)
     try {
       const [p, s] = await Promise.all([
-        capitareGet(`/funds/${CAPITARE_FUND_ID}/debenture-orders/${order.id}/proof`).catch(() => null),
-        capitareGet(`/funds/${CAPITARE_FUND_ID}/debenture-orders/${order.id}/settlement`).catch(() => null),
+        apiGet(`/funds/${FUND_ID}/debenture-orders/${order.id}/proof`).catch(() => null),
+        apiGet(`/funds/${FUND_ID}/debenture-orders/${order.id}/settlement`).catch(() => null),
       ])
       setProof(p)
       setSettlement(s)
@@ -164,7 +164,7 @@ export default function OrdersPage() {
     setLoading(true)
     setError(null)
     try {
-      const data = await capitareGet(`/funds/${CAPITARE_FUND_ID}/debenture-orders`)
+      const data = await apiGet(`/funds/${FUND_ID}/debenture-orders`)
       setOrders(data.items || [])
     } catch (e) {
       setError(e.message || String(e))
@@ -187,7 +187,7 @@ export default function OrdersPage() {
       </div>
       <p className="page-subtitle">
         Debenture orders from the Capitare Observer API &mdash; fund{' '}
-        <code style={{ fontSize: 11 }}>{CAPITARE_FUND_ID}</code>
+        <code style={{ fontSize: 11 }}>{FUND_ID}</code>
       </p>
 
       {/* ── API Key settings ── */}

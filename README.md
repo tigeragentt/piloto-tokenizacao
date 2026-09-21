@@ -57,8 +57,8 @@ secrets.yaml             CRE secret name → env var mapping (no actual values)
 
 | Key | Value | Where it lives |
 |---|---|---|
-| `OBSERVER_ID` | `mb-observer-demo` | `capitareClientId` in `config.staging.json` |
-| `BASE` | `https://dev-api-mercado-bitcoin.web3up.mobi/v1/external/observer` | `capitareBaseUrl` in `config.staging.json` |
+| `OBSERVER_ID` | `mb-observer-demo` | `apiClientId` in `config.staging.json` |
+| `BASE` | `https://dev-api-mercado-bitcoin.web3up.mobi/v1/external/observer` | `apiBaseUrl` in `config.staging.json` |
 | `FUND` | `be6f2e8a-5474-43c7-a692-7918c37e3f42` | `fundId` in `config.staging.json` |
 | `ORDER` (test order) | `8fdac770-7ca3-4a1f-a283-33efa75c96ef` | `testOrderId` in `config.staging.json` |
 | `OBSERVER_KEY` | _(secret)_ | `API_OBSERVER_KEY` in `.env` |

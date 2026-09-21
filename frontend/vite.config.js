@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
   const rootEnv = loadEnv(mode, resolve(process.cwd(), '..'), '')
   const localEnv = loadEnv(mode, process.cwd(), '')
   const env = { ...rootEnv, ...localEnv }
-  const capitareBase = env.CAPITARE_BASE || 'https://dev-api-mercado-bitcoin.web3up.mobi'
+  const apiBase = env.API_BASE || 'https://dev-api-mercado-bitcoin.web3up.mobi'
 
   return {
     plugins: [react()],
@@ -20,16 +20,16 @@ export default defineConfig(({ mode }) => {
       strictPort: false,
       proxy: {
         // Proxy Capitare Observer API calls to avoid CORS in dev
-        '/capitare-api': {
-          target: capitareBase,
+        '/observer-api': {
+          target: apiBase,
           changeOrigin: true,
-          rewrite: path => path.replace(/^\/capitare-api/, '/v1/external/observer'),
+          rewrite: path => path.replace(/^\/observer-api/, '/v1/external/observer'),
         },
-        // Proxy workflow-capitare HTTP trigger (local sim)
-        '/cre-capitare-proxy': {
-          target: env.CRE_CAPITARE_PROXY_TARGET || 'http://localhost:2000/trigger',
+        // Proxy workflow-observer HTTP trigger (local sim)
+        '/cre-observer-proxy': {
+          target: env.CRE_OBSERVER_PROXY_TARGET || 'http://localhost:2000/trigger',
           changeOrigin: true,
-          rewrite: path => path.replace(/^\/cre-capitare-proxy/, ''),
+          rewrite: path => path.replace(/^\/cre-observer-proxy/, ''),
         },
       },
     },
