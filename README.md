@@ -61,13 +61,13 @@ secrets.yaml             CRE secret name → env var mapping (no actual values)
 | `BASE` | `https://dev-api-mercado-bitcoin.web3up.mobi/v1/external/observer` | `capitareBaseUrl` in `config.staging.json` |
 | `FUND` | `be6f2e8a-5474-43c7-a692-7918c37e3f42` | `fundId` in `config.staging.json` |
 | `ORDER` (test order) | `8fdac770-7ca3-4a1f-a283-33efa75c96ef` | `testOrderId` in `config.staging.json` |
-| `OBSERVER_KEY` | _(secret)_ | `CAPITARE_OBSERVER_KEY` in `.env` |
+| `OBSERVER_KEY` | _(secret)_ | `API_OBSERVER_KEY` in `.env` |
 
 ### How to use in tests
 
 **Option A — curl the staging API directly**
 
-Make sure `CAPITARE_OBSERVER_KEY` is exported in your shell first:
+Make sure `API_OBSERVER_KEY` is exported in your shell first:
 
 ```bash
 export OBSERVER_ID='mb-observer-demo'
@@ -103,7 +103,7 @@ curl -s \
 
 **Option B — run CRE simulate against the real staging API**
 
-All four non-secret values are already in `config.staging.json`. Only `CAPITARE_OBSERVER_KEY` needs to be in `.env`:
+All four non-secret values are already in `config.staging.json`. Only `API_OBSERVER_KEY` needs to be in `.env`:
 
 ```bash
 # CRON trigger — scans all orders and anchors settled ones
@@ -279,7 +279,7 @@ bun install --cwd ./workflow-observer
 
 Set CRE secrets (stored in the DON):
 ```
-CAPITARE_OBSERVER_KEY=<from observer-api.env>
+API_OBSERVER_KEY=<from observer-api.env>
 ```
 
 Simulate:

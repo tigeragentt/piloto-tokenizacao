@@ -6,7 +6,7 @@ import {
 import StatusBadge, { BoolBadge } from '../components/StatusBadge.jsx'
 import HashCell from '../components/HashCell.jsx'
 
-const KEY_STORAGE = 'capitare_observer_key'
+const KEY_STORAGE = 'api_observer_key'
 
 function OrderDetail({ order, onClose }) {
   const [proof, setProof]         = useState(null)

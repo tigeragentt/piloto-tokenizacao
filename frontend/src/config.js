@@ -49,7 +49,7 @@ export const CAPITARE_API_BASE = isLocalhost
 
 // API key stored in localStorage — never in the build
 export function getCapitareKey() {
-  return localStorage.getItem('capitare_observer_key') || import.meta.env.VITE_CAPITARE_KEY || ''
+  return localStorage.getItem('api_observer_key') || import.meta.env.VITE_CAPITARE_KEY || ''
 }
 
 export async function capitareGet(path) {

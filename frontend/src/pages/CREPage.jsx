@@ -60,7 +60,7 @@ export default function CREPage() {
             <tr><td>Target</td><td>Observer.sol on Ethereum Sepolia — <code>reportSettlement()</code></td></tr>
             <tr><td>Secrets</td>
               <td>
-                <code>capitare_observer_key</code> (API header) &amp;{' '}
+                <code>api_observer_key</code> (API header) &amp;{' '}
                 <code>cre_transaction_private_key</code> (Sepolia signer)
               </td>
             </tr>

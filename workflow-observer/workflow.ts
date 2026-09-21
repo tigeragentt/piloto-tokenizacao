@@ -246,7 +246,7 @@ const scanAndAnchor = async (runtime: Runtime<Config>): Promise<ScanResult> => {
   if (!network) throw new Error(`Unknown chainSelectorName: ${chainSelectorName}`)
   const evmClient = new EVMClient(network.chainSelector.selector)
 
-  const observerKey = runtime.getSecret({ id: "capitare_observer_key" }).result().value as string
+  const observerKey = runtime.getSecret({ id: "api_observer_key" }).result().value as string
 
   runtime.log(`Fetching orders for fund ${fundId}`)
   const ordersData = capitareGet(runtime, httpClient, `/funds/${fundId}/debenture-orders`, observerKey)
