@@ -223,6 +223,18 @@ const anchorSettlement = (
 
 // ─── Main scan ────────────────────────────────────────────────────────────────
 
+// Polls the Capitare API for all debenture orders in the configured fund, then
+// anchors each fully-settled order on-chain via the Observer contract.
+//
+// For each order it:
+//   1. Skips orders whose progress is not "ACQUIRED_WITH_LOCK" (not yet settled)
+//   2. Skips orders already anchored on-chain (idempotent — reads Observer.isOrderAnchored)
+//   3. Fetches the settlement proof from Capitare (deliveryProofSHA256, resolutionHash, etc.)
+//   4. Skips if technicalSettlementCompleted is false
+//   5. Calls Observer.reportSettlement via CRE writeReport — the DON signs and submits the tx
+//
+// Stops after maxOrdersPerRun anchors to avoid running too long in a single trigger.
+// Returns a ScanResult with counts of anchored / skipped / errored orders.
 const scanAndAnchor = async (runtime: Runtime<Config>): Promise<ScanResult> => {
   const { observerAddress, fundId, maxOrdersPerRun, chainSelectorName } = runtime.config
   const result: ScanResult = { ordersChecked: 0, anchored: 0, skipped: 0, errors: [] }
