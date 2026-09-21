@@ -24,7 +24,7 @@ interface IObserverFund {
     }
 
     struct FundInfo {
-        string  fundId;              // Capitare fund UUID
+        string  fundId;              // Fund UUID
         string  name;                // e.g. "Horizonte Crédito Multirrede FIDC — Piloto XDC"
         string  xdcNetwork;          // "eip155:51"
         address xdcFidcManager;      // fidc-manager contract

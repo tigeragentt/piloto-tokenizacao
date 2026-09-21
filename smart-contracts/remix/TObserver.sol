@@ -71,7 +71,7 @@ contract TObserver is ReceiverTemplate, AccessControl {
     }
 
     struct ActionRecord {
-        string     fundId;     // Capitare fund UUID — links action to its FIDC fund
+        string     fundId;     // Fund UUID — links action to its FIDC fund
         string     network;
         ActionType action;
         string     from;
@@ -89,7 +89,7 @@ contract TObserver is ReceiverTemplate, AccessControl {
     // ─── Settlement Records ──────────────────────────────────────────────────
 
     struct SettlementInput {
-        string   fundId;            // Capitare fund UUID
+        string   fundId;            // Fund UUID
         string   orderId;
         bytes32  intentHash;
         string   progress;
@@ -102,10 +102,10 @@ contract TObserver is ReceiverTemplate, AccessControl {
     }
 
     struct SettlementRecord {
-        string   fundId;               // Capitare fund UUID — links order to its FIDC fund
-        string   orderId;              // Capitare order UUID
+        string   fundId;               // Fund UUID — links order to its FIDC fund
+        string   orderId;              // Order UUID
         bytes32  intentHash;           // cross-chain correlation key (= XRPL InvoiceID)
-        string   progress;             // Capitare progress state at time of anchoring
+        string   progress;             // Progress state at time of anchoring
         bool     technicalCompleted;   // technicalSettlementCompleted from /settlement
         bool     accountingCompleted;  // accountingCompleted from /settlement
         bytes32  deliveryProofSHA256;  // sha256 of delivery-proof manifest; 0x0 if unavailable

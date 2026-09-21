@@ -37,7 +37,7 @@ contract ObserverTestV1 is AccessControl {
     }
 
     struct FundInfo {
-        string  fundId;              // Capitare fund UUID
+        string  fundId;              // Fund UUID
         string  name;                // e.g. "Horizonte Crédito Multirrede FIDC — Piloto XDC"
         string  xdcNetwork;          // "eip155:51"
         address xdcFidcManager;      // fidc-manager contract
@@ -100,9 +100,9 @@ contract ObserverTestV1 is AccessControl {
     }
 
     struct SettlementRecord {
-        string   orderId;              // Capitare order UUID
+        string   orderId;              // Order UUID
         bytes32  intentHash;           // cross-chain correlation key (= XRPL InvoiceID)
-        string   progress;             // Capitare progress state at time of anchoring
+        string   progress;             // Progress state at time of anchoring
         bool     technicalCompleted;   // technicalSettlementCompleted from /settlement
         bool     accountingCompleted;  // accountingCompleted from /settlement
         bytes32  deliveryProofSHA256;  // sha256 of delivery-proof manifest; 0x0 if unavailable
