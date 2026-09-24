@@ -70,8 +70,8 @@ Deploy to Sepolia — deployment order:
 2. Deploy `Observer(forwarderAddress, observerFundAddress)`
 
 After deployment:
-1. Set `observerAddress` in `workflow-observer/config/config.staging.json`
-2. Set `OBSERVER_ADDRESS` and `OBSERVER_FUND_ADDRESS` in the root `.env` (single source of truth for frontend + CRE workflow)
+1. Set `OBSERVER_ADDRESS` and `OBSERVER_FUND_ADDRESS` in root `.env` (single source of truth)
+2. Run `cd workflow-observer && node scripts/sync-config.js` to patch `config.staging.json` from root `.env`
 3. _(Recommended)_ Lock down to your specific workflow after deploying to CRE:
    ```solidity
    observer.setExpectedWorkflowId(YOUR_WORKFLOW_ID)

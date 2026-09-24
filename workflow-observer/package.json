@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "postinstall": "bunx cre-setup"
+    "postinstall": "bunx cre-setup",
+    "sync-config": "node scripts/sync-config.js"
   },
   "dependencies": {
     "@chainlink/cre-sdk": "latest",
