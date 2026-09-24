@@ -4,7 +4,7 @@ Official pilot implementation for the ABToken / CVM regulatory tokenization proj
 
 **Fund:** Horizonte Crédito Multirrede FIDC — Piloto XDC  
 **Regulator:** CVM (Comissão de Valores Mobiliários)  
-**Context:** GTT Frente 2 — debenture tokenization on XDC + XRPL
+**Context:** GTT — debenture tokenization on XD, XRPL and Stellar
 
 ---
 
@@ -38,19 +38,187 @@ escrow proxy (per-order, EIP-1167)
 ```
 smart-contracts/
   contracts/
-    Observer.sol         v1.6.0 — settlement/action proof registry, ReceiverTemplate; fundId in all structs
+    Observer.sol         v1.9.0 — settlement/action proof registry, ReceiverTemplate; fundId in all structs
     ObserverFund.sol     Standalone FIDC fund registry (deployed separately)
     interfaces/          ReceiverTemplate.sol, IReceiver
   remix/                 Testnet/Remix versions (T-prefix, independent versioning)
     IObserverFund.sol   Interface — single source of truth for fund structs
     TObserverFund.sol   v1.1.0 — AccessControl, implements IObserverFund
-    TObserver.sol        v1.3.0 — ReceiverTemplate + AccessControl; fundId in all structs
+    TObserver.sol        v1.4.0 — ReceiverTemplate + AccessControl; fundId in all structs
     ReceiverTemplate.sol Flat copy for Remix (no imports needed)
     ObserverTestV1.sol   v1.0.0 — original monolithic contract, kept for comparison
 workflow-observer/       CRE workflow: polls Observer API, anchors proofs on-chain
 frontend/                React dashboard (Vite) — Dashboard, Orders, Observer, XDC, CRE pages
 project.yaml             CRE project config (Sepolia chain selector + RPC)
 secrets.yaml             CRE secret name → env var mapping (no actual values)
+```
+
+---
+
+## Setup
+
+### Smart contracts
+
+```bash
+cd smart-contracts
+npm install
+npx hardhat compile
+```
+
+Deploy to Sepolia — deployment order:
+1. Deploy `ObserverFund(deployerAddress)`
+2. Deploy `Observer(forwarderAddress, observerFundAddress)`
+
+After deployment:
+1. Set `observerAddress` in `workflow-observer/config/config.staging.json`
+2. Set `OBSERVER_ADDRESS` and `OBSERVER_FUND_ADDRESS` in the root `.env` (single source of truth for frontend + CRE workflow)
+3. _(Recommended)_ Lock down to your specific workflow after deploying to CRE:
+   ```solidity
+   observer.setExpectedWorkflowId(YOUR_WORKFLOW_ID)
+   ```
+
+### CRE workflow
+
+```bash
+cp .env.example .env
+```
+
+Set CRE_ETH_PRIVATE_KEY in .env
+
+```bash
+bun install --cwd ./workflow-observer
+```
+
+Set CRE secrets (stored in the DON):
+
+```
+API_OBSERVER_KEY=<from observer-api.env>
+```
+
+Simulate (no transactions onchain):
+```bash
+cre workflow simulate workflow-observer --target staging-settings --non-interactive --trigger-index 0
+```
+
+Simulate onchain:
+```bash
+cre workflow simulate workflow-observer --target staging-settings --non-interactive --trigger-index 0 --broadcast
+```
+
+Deploy (staging):
+```bash
+bunx cre deploy --env staging
+```
+
+## Observer API endpoints used
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /funds/{fundId}/debenture-orders` | List all orders with progress state |
+| `GET /funds/{fundId}/debenture-orders/{id}/settlement` | Settlement proof (resolutionHash, flags) |
+
+The workflow only anchors orders where `technicalSettlementCompleted = true`.
+
+## Observer.sol — what CVM can verify
+
+| Field | How to verify |
+|---|---|
+| `deliveryProofSHA256` | sha256 of the `capitare:debentures:delivery-proof:v1` canonical manifest |
+| `resolutionHash` | keccak256 of resolution struct; must match `LockResolved` event on XDC escrow |
+| `intentHash` | Cross-reference with XRPL transaction `InvoiceID` field |
+
+## XDC contracts (Apothem testnet, chain 51)
+
+| Contract | Address |
+|---|---|
+| fidc-manager | `0x6E45fFEB71b4d6beA4CC1ddDf8EE310AA49cB3Fa` |
+| fidc | `0x8001BB21f4F061b444F02f50Ab76BAA6a84394A2` |
+| stable BRL-CVM | `0x243e98638D619eB6f10eaBbaCfC071f318D5e9d0` |
+| escrow-factory | `0x5f6d0B7886858ac75c32b9642090067157651Ff4` |
+
+
+---
+
+## Observer contracts
+
+### Two-contract architecture (v1.9.0)
+
+Observer is split into two independently deployable contracts:
+
+| Contract | Role | Access control |
+|---|---|---|
+| `ObserverFund.sol` | FIDC fund registry | `Ownable` — only deployer can `registerFund` |
+| `Observer.sol` | Settlement/action proof registry + CRE receiver | `AccessControl` (ADMIN_ROLE, REPORTER_ROLE) |
+
+Observer stores a reference to ObserverFund and reads from it:
+
+```solidity
+IObserverFund public funds;
+```
+
+Observer's constructor:
+
+```solidity
+constructor(address _forwarderAddress, address _fund)
+```
+
+**Deployment order:**
+1. Deploy `ObserverFund(deployerAddress)`
+2. Deploy `Observer(forwarderAddress, observerFundAddress)`
+
+| Network | Forwarder address |
+|---|---|
+| Ethereum Sepolia — simulation | `0x15fC6ae953E024d975e77382eEeC56A9101f9F88` |
+| Ethereum Sepolia — production | `0xF8344CFd5c43616a4366C34E3EEE75af79a74482` |
+
+### ReceiverTemplate pattern
+
+```
+KeystoneForwarder → onReport() → security checks → _processReport() → _reportSettlement()
+```
+
+### Security setters (onlyOwner)
+
+| Function | Purpose |
+|---|---|
+| `setForwarderAddress(address)` | Update the trusted forwarder. Setting `address(0)` disables the check (insecure) |
+| `setExpectedAuthor(address)` | Restrict `onReport` to a specific CRE workflow owner |
+| `setExpectedWorkflowName(string)` | Restrict by workflow name (requires `setExpectedAuthor` to also be set) |
+| `setExpectedWorkflowId(bytes32)` | Restrict to an exact workflow ID — strongest lock-down |
+
+After deploying and registering the workflow in CRE, call `setExpectedWorkflowId(workflowId)` to ensure only your specific workflow can write to this contract.
+
+### Write paths
+
+| Caller | Contract | Function |
+|---|---|---|
+| Chainlink KeystoneForwarder | Observer | `onReport(bytes metadata, bytes report)` |
+| `REPORTER_ROLE` wallet | Observer | `reportSettlement(SettlementInput)` |
+| `REPORTER_ROLE` wallet | Observer | `reportAction(ActionInput)` |
+| `ADMIN_ROLE` wallet | Observer | `setForwarderAddress / setExpectedAuthor / setExpectedWorkflowId` |
+| Owner wallet | ObserverFund | `registerFund(FundInput)` |
+
+---
+
+## Testing with Remix (T-contracts)
+
+See [`smart-contracts/remix/remix.md`](smart-contracts/remix/remix.md) for compiler settings, load order, deploy order, and test sequences.
+
+---
+
+## Local testing (no real API needed)
+
+Start the Observer API mock server (zero dependencies, Node built-in only):
+
+```bash
+node test/mock-server.js
+# Observer API mock server running on http://localhost:3001
+```
+
+Run the CRE workflow against the mock:
+
+```bash
+cre workflow simulate workflow-observer --target test-settings --non-interactive --trigger-index 0
 ```
 
 ## Known staging test values
@@ -122,89 +290,6 @@ cre workflow simulate workflow-observer --target test-settings --non-interactive
 
 ---
 
-## Observer contracts
-
-### Two-contract architecture (v1.5.0)
-
-Observer is now split into two independently deployable contracts:
-
-| Contract | Role | Access control |
-|---|---|---|
-| `ObserverFund.sol` | FIDC fund registry | `Ownable` — only deployer can `registerFund` |
-| `Observer.sol` | Settlement/action proof registry + CRE receiver | `Ownable` (via ReceiverTemplate) |
-
-Observer stores a reference to ObserverFund and reads from it:
-
-```solidity
-ObserverFund public fund;
-```
-
-Observer's constructor:
-
-```solidity
-constructor(address _forwarderAddress, address _fund)
-```
-
-**Deployment order:**
-1. Deploy `ObserverFund(deployerAddress)`
-2. Deploy `Observer(forwarderAddress, observerFundAddress)`
-
-| Network | Forwarder address |
-|---|---|
-| Ethereum Sepolia — simulation | `0x15fC6ae953E024d975e77382eEeC56A9101f9F88` |
-| Ethereum Sepolia — production | `0xF8344CFd5c43616a4366C34E3EEE75af79a74482` |
-
-### ReceiverTemplate pattern
-
-```
-KeystoneForwarder → onReport() → security checks → _processReport() → _reportSettlement()
-```
-
-### Security setters (onlyOwner)
-
-| Function | Purpose |
-|---|---|
-| `setForwarderAddress(address)` | Update the trusted forwarder. Setting `address(0)` disables the check (insecure) |
-| `setExpectedAuthor(address)` | Restrict `onReport` to a specific CRE workflow owner |
-| `setExpectedWorkflowName(string)` | Restrict by workflow name (requires `setExpectedAuthor` to also be set) |
-| `setExpectedWorkflowId(bytes32)` | Restrict to an exact workflow ID — strongest lock-down |
-
-After deploying and registering the workflow in CRE, call `setExpectedWorkflowId(workflowId)` to ensure only your specific workflow can write to this contract.
-
-### Write paths
-
-| Caller | Contract | Function |
-|---|---|---|
-| Chainlink KeystoneForwarder | Observer | `onReport(bytes metadata, bytes report)` |
-| Owner wallet | Observer | `reportSettlement(SettlementInput)` |
-| Owner wallet | Observer | `reportAction(...)` |
-| Owner wallet | ObserverFund | `registerFund(FundInput)` |
-
----
-
-## Testing with Remix (T-contracts)
-
-See [`smart-contracts/remix/remix.md`](smart-contracts/remix/remix.md) for compiler settings, load order, deploy order, and test sequences.
-
----
-
-## Local testing (no real API needed)
-
-Start the Observer API mock server (zero dependencies, Node built-in only):
-
-```bash
-node test/mock-server.js
-# Observer API mock server running on http://localhost:3001
-```
-
-Run the CRE workflow against the mock:
-
-```bash
-cre workflow simulate workflow-observer --target test-settings --non-interactive --trigger-index 0
-```
-
----
-
 ## Frontend
 
 React + Vite dashboard. Pages: Dashboard, Orders, Observer, API, XDC, CRE.
@@ -216,12 +301,14 @@ cd frontend
 npm install
 ```
 
-Create `frontend/.env` (gitignored):
+Create root `.env` (gitignored) — single source of truth for both frontend and CRE workflow:
 
 ```
-OBSERVER_ADDRESS=<deployed Observer.sol address>
 OBSERVER_FUND_ADDRESS=<deployed ObserverFund.sol address>
+OBSERVER_ADDRESS=<deployed Observer.sol address>
 ```
+
+See `.env.example` for the full list of required variables.
 
 Start the dev server:
 
@@ -244,76 +331,3 @@ npm run build
 - Output directory: `dist`
 - Set `OBSERVER_ADDRESS` and `OBSERVER_FUND_ADDRESS` as environment variables
 
----
-
-## Setup
-
-### Smart contracts
-
-```bash
-cd smart-contracts
-npm install
-npx hardhat compile
-```
-
-Deploy to Sepolia — deployment order:
-1. Deploy `ObserverFund(deployerAddress)`
-2. Deploy `Observer(forwarderAddress, observerFundAddress)`
-
-After deployment:
-1. Set `observerAddress` in `workflow-observer/config/config.staging.json`
-2. Set `OBSERVER_ADDRESS` and `OBSERVER_FUND_ADDRESS` in `frontend/.env`
-3. _(Recommended)_ Lock down to your specific workflow after deploying to CRE:
-   ```solidity
-   observer.setExpectedWorkflowId(YOUR_WORKFLOW_ID)
-   ```
-
-### CRE workflow
-
-```bash
-cp .env.example .env
-# set CRE_ETH_PRIVATE_KEY in .env
-
-bun install --cwd ./workflow-observer
-```
-
-Set CRE secrets (stored in the DON):
-```
-API_OBSERVER_KEY=<from observer-api.env>
-```
-
-Simulate:
-```bash
-cre workflow simulate workflow-observer --target staging-settings --non-interactive --trigger-index 0
-```
-
-Deploy (staging):
-```bash
-bunx cre deploy --env staging
-```
-
-## Observer API endpoints used
-
-| Endpoint | Purpose |
-|---|---|
-| `GET /funds/{fundId}/debenture-orders` | List all orders with progress state |
-| `GET /funds/{fundId}/debenture-orders/{id}/settlement` | Settlement proof (resolutionHash, flags) |
-
-The workflow only anchors orders where `technicalSettlementCompleted = true`.
-
-## Observer.sol — what CVM can verify
-
-| Field | How to verify |
-|---|---|
-| `deliveryProofSHA256` | sha256 of the `capitare:debentures:delivery-proof:v1` canonical manifest |
-| `resolutionHash` | keccak256 of resolution struct; must match `LockResolved` event on XDC escrow |
-| `intentHash` | Cross-reference with XRPL transaction `InvoiceID` field |
-
-## XDC contracts (Apothem testnet, chain 51)
-
-| Contract | Address |
-|---|---|
-| fidc-manager | `0x6E45fFEB71b4d6beA4CC1ddDf8EE310AA49cB3Fa` |
-| fidc | `0x8001BB21f4F061b444F02f50Ab76BAA6a84394A2` |
-| stable BRL-CVM | `0x243e98638D619eB6f10eaBbaCfC071f318D5e9d0` |
-| escrow-factory | `0x5f6d0B7886858ac75c32b9642090067157651Ff4` |
