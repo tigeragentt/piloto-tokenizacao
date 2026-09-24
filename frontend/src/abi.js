@@ -66,7 +66,7 @@ export const OBSERVER_ABI = [
     stateMutability: 'view',
   },
   {
-    name: 'isActionAnchored',
+    name: 'isActionNotarized',
     type: 'function',
     inputs: [
       { name: 'network', type: 'string' },
@@ -76,14 +76,14 @@ export const OBSERVER_ABI = [
     stateMutability: 'view',
   },
   {
-    name: 'isOrderAnchored',
+    name: 'isOrderNotarized',
     type: 'function',
     inputs: [{ name: 'orderId', type: 'string' }],
     outputs: [{ name: '', type: 'bool' }],
     stateMutability: 'view',
   },
   {
-    name: 'isSettlementAnchored',
+    name: 'isSettlementNotarized',
     type: 'function',
     inputs: [{ name: 'intentHash', type: 'bytes32' }],
     outputs: [{ name: '', type: 'bool' }],

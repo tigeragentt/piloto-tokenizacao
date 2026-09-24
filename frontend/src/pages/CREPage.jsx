@@ -175,11 +175,11 @@ export default function CREPage() {
           <div><span style={{ color: 'var(--accent2)' }}>Cron trigger (every 2 min)</span></div>
           <div style={{ paddingLeft: 20 }}>↓ GET /funds/:fundId/debenture-orders</div>
           <div style={{ paddingLeft: 20 }}>↓ filter: progress = ACQUIRED_WITH_LOCK &amp; technicalSettlementCompleted = true</div>
-          <div style={{ paddingLeft: 20 }}>↓ for each order: isSettlementAnchored(intentHash) → skip if already anchored</div>
+          <div style={{ paddingLeft: 20 }}>↓ for each order: isSettlementNotarized(intentHash) → skip if already notarized</div>
           <div style={{ paddingLeft: 20 }}>↓ GET /funds/:fundId/debenture-orders/:id/settlement</div>
           <div style={{ paddingLeft: 20 }}>↓ GET /funds/:fundId/debenture-orders/:id/proof</div>
           <div style={{ paddingLeft: 20 }}>↓ <span style={{ color: 'var(--green)' }}>Observer.reportSettlement(orderId, intentHash, …)</span> on Sepolia</div>
-          <div style={{ paddingLeft: 20 }}>↓ emit <span style={{ color: 'var(--accent)' }}>SettlementAnchored</span> event</div>
+          <div style={{ paddingLeft: 20 }}>↓ emit <span style={{ color: 'var(--accent)' }}>SettlementReported</span> event</div>
         </div>
       </div>
     </div>

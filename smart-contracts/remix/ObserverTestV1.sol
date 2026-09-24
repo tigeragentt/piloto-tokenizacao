@@ -12,8 +12,8 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
 contract ObserverTestV1 is AccessControl {
 
     error FundAlreadyRegistered();
-    error ActionAlreadyAnchored();
-    error OrderAlreadyAnchored();
+    error ActionAlreadyNotarized();
+    error OrderAlreadyNotarized();
     error NotFound();
     error InvalidRange();
     error OutOfBounds();
@@ -66,8 +66,8 @@ contract ObserverTestV1 is AccessControl {
         FundingAcknowledged,   // 9  FIDC acknowledged cash lock
         LockResolved,          // 10 escrow cash lock released on XDC
         ExcessReturned,        // 11
-        DeliveryProofAnchored, // 12 delivery proof SHA256 anchored
-        SettlementProofAnchored, // 13 full settlement proof anchored
+        DeliveryProofNotarized, // 12 delivery proof SHA256 notarized
+        SettlementProofNotarized, // 13 full settlement proof notarized
         Divergence             // 14 cross-chain mismatch detected
     }
 
@@ -83,7 +83,7 @@ contract ObserverTestV1 is AccessControl {
     }
 
     ActionRecord[]           private _actions;
-    mapping(bytes32 => bool) private _txAnchored;   // keccak256(network ++ txHash) → seen
+    mapping(bytes32 => bool) private _txNotarized;   // keccak256(network ++ txHash) → seen
 
     // ─── Settlement Records ─────────────────────────────────────────────────
 
@@ -114,7 +114,7 @@ contract ObserverTestV1 is AccessControl {
     }
 
     SettlementRecord[]       private _settlements;
-    mapping(string => bool)  private _orderAnchored;   // orderId → seen
+    mapping(string => bool)  private _orderNotarized;   // orderId → seen
 
     // intentHash → 1-based index into _settlements (workflow lookup key)
     mapping(bytes32 => uint256) public latestSettlementId;
@@ -183,8 +183,8 @@ contract ObserverTestV1 is AccessControl {
         string     calldata txHash
     ) external onlyRole(REPORTER_ROLE) returns (uint256 recordId) {
         bytes32 txKey = keccak256(abi.encodePacked(network, txHash));
-        if (_txAnchored[txKey]) revert ActionAlreadyAnchored();
-        _txAnchored[txKey] = true;
+        if (_txNotarized[txKey]) revert ActionAlreadyNotarized();
+        _txNotarized[txKey] = true;
         recordId = _actions.length;
         _actions.push(ActionRecord({
             network: network, action: action,
@@ -196,8 +196,8 @@ contract ObserverTestV1 is AccessControl {
     }
 
     function reportSettlement(SettlementInput calldata s) external onlyRole(REPORTER_ROLE) returns (uint256 recordId) {
-        if (_orderAnchored[s.orderId]) revert OrderAlreadyAnchored();
-        _orderAnchored[s.orderId] = true;
+        if (_orderNotarized[s.orderId]) revert OrderAlreadyNotarized();
+        _orderNotarized[s.orderId] = true;
         recordId = _settlements.length;
         _settlements.push(SettlementRecord({
             orderId:             s.orderId,
@@ -226,15 +226,15 @@ contract ObserverTestV1 is AccessControl {
         return _fundIdToIndex[fundId] != 0;
     }
 
-    function isActionAnchored(string calldata network, string calldata txHash) external view returns (bool) {
-        return _txAnchored[keccak256(abi.encodePacked(network, txHash))];
+    function isActionNotarized(string calldata network, string calldata txHash) external view returns (bool) {
+        return _txNotarized[keccak256(abi.encodePacked(network, txHash))];
     }
 
-    function isOrderAnchored(string calldata orderId) external view returns (bool) {
-        return _orderAnchored[orderId];
+    function isOrderNotarized(string calldata orderId) external view returns (bool) {
+        return _orderNotarized[orderId];
     }
 
-    function isSettlementAnchored(bytes32 intentHash) external view returns (bool) {
+    function isSettlementNotarized(bytes32 intentHash) external view returns (bool) {
         return latestSettlementId[intentHash] != 0;
     }
 

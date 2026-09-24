@@ -30,8 +30,8 @@ contract Observer is ReceiverTemplate, AccessControl {
 
     // ─── Errors ─────────────────────────────────────────────────────────────
 
-    error ActionAlreadyAnchored();
-    error OrderAlreadyAnchored();
+    error ActionAlreadyNotarized();
+    error OrderAlreadyNotarized();
     error FundNotRegistered();
     error NotFound();
     error InvalidRange();
@@ -39,7 +39,7 @@ contract Observer is ReceiverTemplate, AccessControl {
 
     // ─── Constants ───────────────────────────────────────────────────────────
 
-    string public constant VERSION = "1.8.0";
+    string public constant VERSION = "1.9.0";
     bytes32 public constant ADMIN_ROLE    = keccak256("ADMIN_ROLE");
     bytes32 public constant REPORTER_ROLE = keccak256("REPORTER_ROLE");
 
@@ -61,8 +61,8 @@ contract Observer is ReceiverTemplate, AccessControl {
         FundingAcknowledged,   // 8  FIDC acknowledged cash lock
         LockResolved,          // 9  escrow cash lock released on XDC
         ExcessReturned,        // 10
-        DeliveryProofAnchored, // 11 delivery proof SHA256 anchored
-        SettlementProofAnchored, // 12 full settlement proof anchored
+        DeliveryProofNotarized, // 11 delivery proof SHA256 notarized
+        SettlementProofNotarized, // 12 full settlement proof notarized
         Divergence             // 13 cross-chain mismatch detected
     }
 
@@ -89,7 +89,7 @@ contract Observer is ReceiverTemplate, AccessControl {
     }
 
     ActionRecord[]           private _actions;
-    mapping(bytes32 => bool) private _txAnchored;      // keccak256(network ++ txHash) → seen
+    mapping(bytes32 => bool) private _txNotarized;      // keccak256(network ++ txHash) → seen
     mapping(string => uint256[]) private _fundActions; // fundId → action record IDs
 
     // ─── Settlement Records ──────────────────────────────────────────────────
@@ -123,7 +123,7 @@ contract Observer is ReceiverTemplate, AccessControl {
     }
 
     SettlementRecord[]       private _settlements;
-    mapping(string => bool)  private _orderAnchored;         // orderId → seen
+    mapping(string => bool)  private _orderNotarized;         // orderId → seen
     mapping(string => uint256[]) private _fundSettlements;   // fundId → settlement record IDs
 
     // intentHash → 1-based index into _settlements (workflow lookup key)
@@ -174,8 +174,8 @@ contract Observer is ReceiverTemplate, AccessControl {
     function reportAction(ActionInput calldata a) external onlyRole(REPORTER_ROLE) returns (uint256 recordId) {
         if (!funds.isFundRegistered(a.fundId)) revert FundNotRegistered();
         bytes32 txKey = keccak256(abi.encodePacked(a.network, a.txHash));
-        if (_txAnchored[txKey]) revert ActionAlreadyAnchored();
-        _txAnchored[txKey] = true;
+        if (_txNotarized[txKey]) revert ActionAlreadyNotarized();
+        _txNotarized[txKey] = true;
         recordId = _actions.length;
         _actions.push(ActionRecord({
             fundId: a.fundId, network: a.network, action: a.action,
@@ -202,8 +202,8 @@ contract Observer is ReceiverTemplate, AccessControl {
 
     function _reportSettlement(SettlementInput memory s) internal returns (uint256 recordId) {
         if (!funds.isFundRegistered(s.fundId)) revert FundNotRegistered();
-        if (_orderAnchored[s.orderId]) revert OrderAlreadyAnchored();
-        _orderAnchored[s.orderId] = true;
+        if (_orderNotarized[s.orderId]) revert OrderAlreadyNotarized();
+        _orderNotarized[s.orderId] = true;
         recordId = _settlements.length;
         _settlements.push(SettlementRecord({
             fundId:              s.fundId,
@@ -236,15 +236,15 @@ contract Observer is ReceiverTemplate, AccessControl {
 
     // ─── Existence Checks ─────────────────────────────────────────────────────
 
-    function isActionAnchored(string calldata network, string calldata txHash) external view returns (bool) {
-        return _txAnchored[keccak256(abi.encodePacked(network, txHash))];
+    function isActionNotarized(string calldata network, string calldata txHash) external view returns (bool) {
+        return _txNotarized[keccak256(abi.encodePacked(network, txHash))];
     }
 
-    function isOrderAnchored(string calldata orderId) external view returns (bool) {
-        return _orderAnchored[orderId];
+    function isOrderNotarized(string calldata orderId) external view returns (bool) {
+        return _orderNotarized[orderId];
     }
 
-    function isSettlementAnchored(bytes32 intentHash) external view returns (bool) {
+    function isSettlementNotarized(bytes32 intentHash) external view returns (bool) {
         return latestSettlementId[intentHash] != 0;
     }
 

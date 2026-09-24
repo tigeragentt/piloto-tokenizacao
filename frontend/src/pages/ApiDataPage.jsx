@@ -42,7 +42,7 @@ export default function ApiDataPage() {
       const enriched = await Promise.all(orders.map(async (order) => {
         let settlement = null
         let proof = null
-        let anchored = null
+        let notarized = null
 
         if (order.settlementCompleted) {
           const [s, p] = await Promise.all([
@@ -54,10 +54,10 @@ export default function ApiDataPage() {
         }
 
         if (readContract) {
-          anchored = await readContract.isOrderAnchored(order.id).catch(() => null)
+          notarized = await readContract.isOrderNotarized(order.id).catch(() => null)
         }
 
-        return { order, settlement, proof, anchored }
+        return { order, settlement, proof, notarized }
       }))
 
       setRows(enriched)
@@ -103,7 +103,7 @@ export default function ApiDataPage() {
       setTxs(prev => ({ ...prev, [order.id]: tx.hash }))
       await tx.wait()
       setRows(prev => prev.map(r =>
-        r.order.id === order.id ? { ...r, anchored: true } : r
+        r.order.id === order.id ? { ...r, notarized: true } : r
       ))
     } catch (e) {
       alert(`Anchor failed: ${e.reason || e.message}`)
@@ -112,8 +112,8 @@ export default function ApiDataPage() {
     }
   }
 
-  const readyCount    = rows?.filter(r => r.order.settlementCompleted && r.anchored === false).length ?? 0
-  const anchoredCount = rows?.filter(r => r.anchored === true).length ?? 0
+  const readyCount      = rows?.filter(r => r.order.settlementCompleted && r.notarized === false).length ?? 0
+  const notarizedCount  = rows?.filter(r => r.notarized === true).length ?? 0
 
   return (
     <div>
@@ -124,7 +124,7 @@ export default function ApiDataPage() {
         </button>
       </div>
       <p className="page-subtitle">
-        Workflow simulation — Observer API orders vs. Observer.sol anchoring status on Sepolia
+        Workflow simulation — Observer API orders vs. Observer.sol notarization status on Sepolia
       </p>
 
       {!apiKey && (
@@ -142,9 +142,9 @@ export default function ApiDataPage() {
       {rows && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 20 }}>
           {[
-            { label: 'Total orders',         value: rows.length,  color: 'var(--text)' },
-            { label: 'Ready to anchor',      value: readyCount,   color: readyCount > 0 ? 'var(--warn)' : 'var(--green)' },
-            { label: 'Anchored on Observer', value: anchoredCount, color: 'var(--green)' },
+            { label: 'Total orders',           value: rows.length,    color: 'var(--text)' },
+            { label: 'Ready to notarize',      value: readyCount,     color: readyCount > 0 ? 'var(--warn)' : 'var(--green)' },
+            { label: 'Notarized on Observer',  value: notarizedCount, color: 'var(--green)' },
           ].map(({ label, value, color }) => (
             <div key={label} className="card" style={{ textAlign: 'center', padding: '14px 10px' }}>
               <div style={{ fontSize: 30, fontWeight: 700, color }}>{value}</div>
@@ -170,10 +170,10 @@ export default function ApiDataPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map(({ order, settlement, proof, anchored }) => {
-                    const txHash    = txs[order.id]
-                    const isAnch    = anchoringId === order.id
-                    const canAnchor = OBSERVER_ADDRESS && order.settlementCompleted && settlement && anchored === false && !txHash
+                  {rows.map(({ order, settlement, proof, notarized }) => {
+                    const txHash      = txs[order.id]
+                    const isAnch      = anchoringId === order.id
+                    const canNotarize = OBSERVER_ADDRESS && order.settlementCompleted && settlement && notarized === false && !txHash
 
                     return (
                       <tr key={order.id} style={{ borderBottom: '1px solid var(--border)' }}>
@@ -205,9 +205,9 @@ export default function ApiDataPage() {
                         </td>
 
                         <td style={{ padding: '8px 10px' }}>
-                          {anchored === null
+                          {notarized === null
                             ? <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>—</span>
-                            : <BoolBadge value={anchored} trueLabel="anchored" falseLabel="not anchored" />
+                            : <BoolBadge value={notarized} trueLabel="notarized" falseLabel="not notarized" />
                           }
                           {txHash && (
                             <div style={{ marginTop: 3 }}>
@@ -220,20 +220,20 @@ export default function ApiDataPage() {
                         </td>
 
                         <td style={{ padding: '8px 10px' }}>
-                          {canAnchor && (
+                          {canNotarize && (
                             <button className="btn btn-primary btn-sm"
                               disabled={isAnch}
                               onClick={() => anchor({ order, settlement, proof })}>
-                              {isAnch ? <><span className="spinner" />Anchoring…</> : 'Anchor →'}
+                              {isAnch ? <><span className="spinner" />Notarizing…</> : 'Notarize →'}
                             </button>
                           )}
-                          {anchored === true && !isAnch && (
-                            <span style={{ color: 'var(--green)', fontSize: 11 }}>✓ Anchored</span>
+                          {notarized === true && !isAnch && (
+                            <span style={{ color: 'var(--green)', fontSize: 11 }}>✓ Notarized</span>
                           )}
                           {!order.settlementCompleted && (
                             <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>Not ready</span>
                           )}
-                          {order.settlementCompleted && !settlement && anchored !== true && (
+                          {order.settlementCompleted && !settlement && notarized !== true && (
                             <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>No proof</span>
                           )}
                         </td>

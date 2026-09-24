@@ -87,7 +87,7 @@ export default function Dashboard() {
           <div className="stat-sub">ACQUIRED_WITH_LOCK</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Anchored on Sepolia</div>
+          <div className="stat-label">Notarized on Sepolia</div>
           <div className="stat-value" style={{ color: OBSERVER_ADDRESS ? 'var(--accent)' : 'var(--text-dim)' }}>
             {loading ? <span className="spinner" /> : (observer?.count ?? (OBSERVER_ADDRESS ? '—' : 'not deployed'))}
           </div>
@@ -184,7 +184,7 @@ export default function Dashboard() {
             </div>
           ) : (
             <p style={{ color: 'var(--text-dim)', fontSize: 13 }}>
-              {loading ? <span className="spinner" /> : 'No settlement records anchored yet.'}
+              {loading ? <span className="spinner" /> : 'No settlement records notarized yet.'}
             </p>
           )}
         </div>

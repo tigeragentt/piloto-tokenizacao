@@ -46,7 +46,7 @@ function SettlementTable({ records }) {
   const [expanded, setExpanded] = useState(null)
 
   if (!records || records.length === 0) {
-    return <p style={{ color: 'var(--text-dim)', fontSize: 13 }}>No settlement records anchored yet.</p>
+    return <p style={{ color: 'var(--text-dim)', fontSize: 13 }}>No settlement records notarized yet.</p>
   }
 
   return (
@@ -113,7 +113,7 @@ function SettlementTable({ records }) {
                           </tr>
                           <tr><td>Source network</td><td>{r.sourceNetwork}</td></tr>
                           <tr><td>Destination network</td><td>{r.destinationNetwork}</td></tr>
-                          <tr><td>Anchored at</td><td>{formatTimestamp(r.reportedAt)}</td></tr>
+                          <tr><td>Notarized at</td><td>{formatTimestamp(r.reportedAt)}</td></tr>
                         </tbody>
                       </table>
                     </td>
@@ -140,14 +140,14 @@ function LookupPanel({ observerContract }) {
     setErrMsg(null)
     try {
       const h = intentHash.trim().startsWith('0x') ? intentHash.trim() : `0x${intentHash.trim()}`
-      const anchored = await observerContract.isSettlementAnchored(h)
-      if (!anchored) {
-        setResult({ anchored: false })
+      const notarized = await observerContract.isSettlementNotarized(h)
+      if (!notarized) {
+        setResult({ notarized: false })
         setStatus('success')
         return
       }
       const rec = await observerContract.getLatestSettlement(h)
-      setResult({ anchored: true, record: rec })
+      setResult({ notarized: true, record: rec })
       setStatus('success')
     } catch (e) {
       setErrMsg(e.message || String(e))
@@ -158,7 +158,7 @@ function LookupPanel({ observerContract }) {
   return (
     <div className="fn-card">
       <div className="fn-header">
-        <span className="fn-name">isSettlementAnchored / getLatestSettlement</span>
+        <span className="fn-name">isSettlementNotarized / getLatestSettlement</span>
         <span className="fn-badge read">read</span>
       </div>
       <p style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>
@@ -180,8 +180,8 @@ function LookupPanel({ observerContract }) {
         {status === 'loading' ? <><span className="spinner" />Looking up…</> : 'Look Up'}
       </button>
       {errMsg && <div className="fn-result error">{errMsg}</div>}
-      {result && !result.anchored && <div className="fn-result error">Not anchored in Observer.</div>}
-      {result?.anchored && result.record && (
+      {result && !result.notarized && <div className="fn-result error">Not notarized in Observer.</div>}
+      {result?.notarized && result.record && (
         <div style={{ marginTop: 10 }}>
           <div className="fn-result success">Found — record details below</div>
           <table className="info-table" style={{ marginTop: 8 }}>
@@ -192,7 +192,7 @@ function LookupPanel({ observerContract }) {
               <tr><td>Accounting settled</td><td><BoolBadge value={result.record.accountingCompleted} /></td></tr>
               <tr><td>deliveryProofSHA256</td><td><HashCell hash={result.record.deliveryProofSHA256} chars={16} /></td></tr>
               <tr><td>resolutionHash</td><td><HashCell hash={result.record.resolutionHash} chars={16} /></td></tr>
-              <tr><td>Anchored at</td><td>{formatTimestamp(result.record.reportedAt)}</td></tr>
+              <tr><td>Notarized at</td><td>{formatTimestamp(result.record.reportedAt)}</td></tr>
               <tr><td>Block</td>
                 <td>
                   <a href={sepoliaBlockUrl(Number(result.record.blockNumber))} target="_blank" rel="noopener noreferrer"
@@ -511,7 +511,7 @@ export default function ObserverPage() {
       {/* ── Stats ── */}
       <div className="dashboard-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))' }}>
         <div className="stat-card">
-          <div className="stat-label">Anchored Records</div>
+          <div className="stat-label">Notarized Records</div>
           <div className="stat-value">{loading ? <span className="spinner" /> : (count ?? '—')}</div>
           <div className="stat-sub">settlement reports on Sepolia</div>
         </div>
@@ -528,7 +528,7 @@ export default function ObserverPage() {
       <div className="section-label">Settlement Records</div>
       <div className="card">
         <div className="card-title">
-          Recent Anchored Settlement Proofs (newest first)
+          Recent Notarized Settlement Proofs (newest first)
         </div>
         {loading && <p style={{ color: 'var(--text-dim)' }}><span className="spinner" />Loading from Sepolia…</p>}
         {!loading && <SettlementTable records={records} />}
