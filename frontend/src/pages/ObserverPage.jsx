@@ -285,6 +285,83 @@ function AdminPanel({ signer }) {
   )
 }
 
+function FundsListPanel() {
+  const [funds, setFunds]   = useState(null)
+  const [count, setCount]   = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [err, setErr]       = useState(null)
+
+  async function load() {
+    if (!OBSERVER_FUND_ADDRESS) return
+    setLoading(true)
+    setErr(null)
+    try {
+      const c = new ethers.Contract(OBSERVER_FUND_ADDRESS, OBSERVER_FUND_ABI, new ethers.JsonRpcProvider(SEPOLIA_RPC))
+      const n = Number(await c.getFundCount())
+      setCount(n)
+      const list = n > 0 ? await c.getLatestFunds(n) : []
+      setFunds([...list])
+    } catch (e) {
+      setErr(e.message || String(e))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { load() }, [])
+
+  if (!OBSERVER_FUND_ADDRESS) return null
+
+  return (
+    <div className="fn-card">
+      <div className="fn-header">
+        <span className="fn-name">Registered Funds</span>
+        <span className="fn-badge read">read</span>
+        <button className="btn btn-secondary btn-sm" style={{ marginLeft: 'auto' }} onClick={load} disabled={loading}>
+          {loading ? <><span className="spinner" />Loading…</> : 'Refresh'}
+        </button>
+      </div>
+
+      {err && <div className="fn-result error">{err}</div>}
+      {!loading && count === 0 && (
+        <p style={{ color: 'var(--text-dim)', fontSize: 13 }}>No funds registered yet.</p>
+      )}
+      {funds && funds.length > 0 && (
+        <div style={{ overflowX: 'auto', marginTop: 8 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid var(--border)' }}>
+                {['#', 'Fund ID', 'Name', 'Currency', 'XDC Network', 'XRPL Network'].map(h => (
+                  <th key={h} style={{ textAlign: 'left', padding: '6px 10px', color: 'var(--text-dim)', fontWeight: 500, fontSize: 11 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {funds.map((f, i) => (
+                <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '8px 10px', color: 'var(--text-dim)' }}>{i}</td>
+                  <td style={{ padding: '8px 10px', fontFamily: 'monospace', color: 'var(--accent2)', whiteSpace: 'nowrap' }}>
+                    {f.fundId.slice(0, 8)}…
+                  </td>
+                  <td style={{ padding: '8px 10px', whiteSpace: 'nowrap' }}>{f.name}</td>
+                  <td style={{ padding: '8px 10px', fontFamily: 'monospace' }}>{f.debentureCurrency}</td>
+                  <td style={{ padding: '8px 10px', fontFamily: 'monospace', fontSize: 11 }}>{f.xdcNetwork}</td>
+                  <td style={{ padding: '8px 10px', fontFamily: 'monospace', fontSize: 11 }}>{f.xrplNetwork}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {count !== null && (
+        <p style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8 }}>
+          {count} fund{count !== 1 ? 's' : ''} registered on-chain
+        </p>
+      )}
+    </div>
+  )
+}
+
 const PILOT_FUND_VALUES = {
   fundId:            FUND_ID,
   name:              'Horizonte Crédito Multirrede FIDC — Piloto XDC',
@@ -461,6 +538,12 @@ export default function ObserverPage() {
       <div className="section-label">Verify by intentHash</div>
       <div className="fn-list">
         <LookupPanel observerContract={new ethers.Contract(OBSERVER_ADDRESS, OBSERVER_ABI, readProvider)} />
+      </div>
+
+      {/* ── Funds ── */}
+      <div className="section-label">Registered Funds (ObserverFund.sol)</div>
+      <div className="fn-list">
+        <FundsListPanel />
       </div>
 
       {/* ── Admin ── */}
