@@ -1,0 +1,8 @@
+{
+  "scripts": {
+    "sync-config": "node workflow-observer/scripts/sync-config.js"
+  },
+  "dependencies": {
+    "piloto-tokenizacao-frontend": "file:frontend"
+  }
+}
