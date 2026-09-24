@@ -5,6 +5,6 @@
   "testOrderId": "8fdac770-7ca3-4a1f-a283-33efa75c96ef",
   "schedule": "0 */2 * * * *",
   "chainSelectorName": "ethereum-testnet-sepolia",
-  "observerAddress": "0x6cd2D719bb3170a04ab69fee92c6E9659AAd7757",
+  "observerAddress": "0xFC4C83CFE41911c518A3831B180E92cc2a551cA6",
   "maxOrdersPerRun": 1
 }
