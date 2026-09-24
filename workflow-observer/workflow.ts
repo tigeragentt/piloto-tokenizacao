@@ -39,7 +39,7 @@ export type Config = {
 
 const OBSERVER_ABI = [
   {
-    name: "isOrderAnchored",
+    name: "isOrderNotarized",
     type: "function",
     inputs: [{ name: "orderId", type: "string" }],
     outputs: [{ name: "", type: "bool" }],
@@ -76,13 +76,13 @@ type SettlementResponse = {
 
 type ScanResult = {
   ordersChecked: number
-  anchored: number
+  notarized: number
   skipped: number
   errors: string[]
 }
 
 // Envelope returned by apiGet — never null (CRE consensus can't wrap null)
-type ApiResult = { found: false } | { found: true; body: object }
+type ApiResult<T = object> = { found: false } | { found: true; body: T }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -96,12 +96,15 @@ const ZERO_BYTES32: `0x${string}` = "0x00000000000000000000000000000000000000000
 
 // ─── Observer API helpers ─────────────────────────────────────────────────────
 
-const apiGet = (
+// project runs inside the HTTP callback — before the value enters consensus —
+// so only the stripped fields count toward the 25 KB observation limit.
+const apiGet = <T = object>(
   runtime: Runtime<Config>,
   httpClient: HTTPClient,
   path: string,
   observerKey: string,
-): ApiResult => {
+  project?: (raw: Record<string, unknown>) => T,
+): ApiResult<T> => {
   const { apiBaseUrl, apiClientId } = runtime.config
   const url = `${apiBaseUrl}${path}`
   // Serialize to string — consensusIdenticalAggregation only reliably handles primitives
@@ -120,16 +123,17 @@ const apiGet = (
       }).result()
       if (r.statusCode === 404) return JSON.stringify({ found: false })
       if (!ok(r)) throw new Error(`Observer API GET ${path} → HTTP ${r.statusCode}`)
-      return JSON.stringify({ found: true, body: json(r) })
+      const body = json(r) as Record<string, unknown>
+      return JSON.stringify({ found: true, body: project ? project(body) : body })
     },
     consensusIdenticalAggregation<string>()
   )().result()
-  return JSON.parse(raw) as ApiResult
+  return JSON.parse(raw) as ApiResult<T>
 }
 
 // ─── Observer check ───────────────────────────────────────────────────────────
 
-const isAlreadyAnchored = (
+const isAlreadyNotarized = (
   runtime: Runtime<Config>,
   evmClient: EVMClient,
   orderId: string,
@@ -137,7 +141,7 @@ const isAlreadyAnchored = (
   const { observerAddress } = runtime.config
   const callData = encodeFunctionData({
     abi: OBSERVER_ABI,
-    functionName: "isOrderAnchored",
+    functionName: "isOrderNotarized",
     args: [orderId],
   })
   const result = evmClient.callContract(runtime, {
@@ -150,7 +154,7 @@ const isAlreadyAnchored = (
   }).result()
   return decodeFunctionResult({
     abi: OBSERVER_ABI,
-    functionName: "isOrderAnchored",
+    functionName: "isOrderNotarized",
     data: bytesToHex(result.data),
   }) as boolean
 }
@@ -224,20 +228,20 @@ const anchorSettlement = (
 // ─── Main scan ────────────────────────────────────────────────────────────────
 
 // Polls the Observer API for all debenture orders in the configured fund, then
-// anchors each fully-settled order on-chain via the Observer contract.
+// notarizes each fully-settled order on-chain via the Observer contract.
 //
 // For each order it:
 //   1. Skips orders whose progress is not "ACQUIRED_WITH_LOCK" (not yet settled)
-//   2. Skips orders already anchored on-chain (idempotent — reads Observer.isOrderAnchored)
+//   2. Skips orders already notarized on-chain (idempotent — reads Observer.isOrderNotarized)
 //   3. Fetches the settlement proof from the Observer API (deliveryProofSHA256, resolutionHash, etc.)
 //   4. Skips if technicalSettlementCompleted is false
 //   5. Calls Observer.reportSettlement via CRE writeReport — the DON signs and submits the tx
 //
-// Stops after maxOrdersPerRun anchors to avoid running too long in a single trigger.
-// Returns a ScanResult with counts of anchored / skipped / errored orders.
+// Stops after maxOrdersPerRun notarizations to avoid running too long in a single trigger.
+// Returns a ScanResult with counts of notarized / skipped / errored orders.
 const scanAndAnchor = async (runtime: Runtime<Config>): Promise<ScanResult> => {
   const { observerAddress, fundId, maxOrdersPerRun, chainSelectorName } = runtime.config
-  const result: ScanResult = { ordersChecked: 0, anchored: 0, skipped: 0, errors: [] }
+  const result: ScanResult = { ordersChecked: 0, notarized: 0, skipped: 0, errors: [] }
   let processed = 0
 
   const httpClient = new HTTPClient()
@@ -249,7 +253,19 @@ const scanAndAnchor = async (runtime: Runtime<Config>): Promise<ScanResult> => {
   const observerKey = runtime.getSecret({ id: "api_observer_key" }).result().value as string
 
   runtime.log(`Fetching orders for fund ${fundId}`)
-  const ordersData = apiGet(runtime, httpClient, `/funds/${fundId}/debenture-orders`, observerKey)
+  const ordersData = apiGet(runtime, httpClient, `/funds/${fundId}/debenture-orders`, observerKey,
+    (raw) => ({
+      items: ((raw.items ?? []) as Record<string, unknown>[]).map((o) => ({
+        id: o.id as string,
+        intentHash: o.intentHash as string,
+        progress: o.progress as string,
+        intent: {
+          sourceNetwork: (o.intent as Record<string, unknown>)?.sourceNetwork as string ?? "",
+          destinationNetwork: (o.intent as Record<string, unknown>)?.destinationNetwork as string ?? "",
+        },
+      })),
+    })
+  )
   if (!ordersData.found) {
     runtime.log("No orders data (404) — fund not found or no orders yet")
     return result
@@ -275,17 +291,24 @@ const scanAndAnchor = async (runtime: Runtime<Config>): Promise<ScanResult> => {
     }
 
     try {
-      if (observerAddress && isAlreadyAnchored(runtime, evmClient, order.id)) {
-        runtime.log(`Order ${order.id}: already anchored — skip`)
+      if (observerAddress && isAlreadyNotarized(runtime, evmClient, order.id)) {
+        runtime.log(`Order ${order.id}: already notarized — skip`)
         result.skipped++
         continue
       }
 
       runtime.log(`Order ${order.id}: fetching settlement proof`)
-      const settlementData = apiGet(
-        runtime, httpClient,
+      const settlementData = apiGet(runtime, httpClient,
         `/funds/${fundId}/debenture-orders/${order.id}/settlement`,
         observerKey,
+        (raw) => ({
+          resolutionHash:               raw.resolutionHash as string,
+          technicalSettlementCompleted: raw.technicalSettlementCompleted as boolean,
+          accountingCompleted:          raw.accountingCompleted as boolean,
+          resolution: {
+            deliveryProofSHA256: (raw.resolution as Record<string, unknown>)?.deliveryProofSHA256 as string ?? "",
+          },
+        })
       )
       if (!settlementData.found) {
         runtime.log(`Order ${order.id}: settlement endpoint returned 404 — skip`)
@@ -301,13 +324,13 @@ const scanAndAnchor = async (runtime: Runtime<Config>): Promise<ScanResult> => {
       }
 
       if (!observerAddress) {
-        runtime.log(`Order ${order.id}: ready to anchor but observerAddress is empty — dry run only`)
+        runtime.log(`Order ${order.id}: ready to notarize but observerAddress is empty — dry run only`)
         result.skipped++
         continue
       }
 
       anchorSettlement(runtime, evmClient, order, settlement)
-      result.anchored++
+      result.notarized++
       processed++
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -317,7 +340,7 @@ const scanAndAnchor = async (runtime: Runtime<Config>): Promise<ScanResult> => {
     }
   }
 
-  runtime.log(`Scan complete: ${result.anchored} anchored, ${result.skipped} skipped, ${result.errors.length} errors`)
+  runtime.log(`Scan complete: ${result.notarized} notarized, ${result.skipped} skipped, ${result.errors.length} errors`)
   return result
 }
 
