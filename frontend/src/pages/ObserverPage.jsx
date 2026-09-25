@@ -139,7 +139,8 @@ function LookupPanel({ observerContract }) {
     setResult(null)
     setErrMsg(null)
     try {
-      const h = intentHash.trim().startsWith('0x') ? intentHash.trim() : `0x${intentHash.trim()}`
+      const clean = intentHash.replace(/\s+/g, '')
+      const h = clean.startsWith('0x') ? clean : `0x${clean}`
       const notarized = await observerContract.isSettlementNotarized(h)
       if (!notarized) {
         setResult({ notarized: false })
@@ -172,7 +173,7 @@ function LookupPanel({ observerContract }) {
             style={{ width: '100%', minWidth: 400 }}
             placeholder="0x61179240cd0b..."
             value={intentHash}
-            onChange={e => setIntentHash(e.target.value)}
+            onChange={e => setIntentHash(e.target.value.replace(/\s+/g, ''))}
           />
         </div>
       </div>

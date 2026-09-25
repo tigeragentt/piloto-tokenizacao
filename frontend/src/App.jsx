@@ -7,6 +7,7 @@ import ObserverPage from './pages/ObserverPage.jsx'
 import XDCPage from './pages/XDCPage.jsx'
 import CREPage from './pages/CREPage.jsx'
 import ApiDataPage from './pages/ApiDataPage.jsx'
+import RemixPage from './pages/RemixPage.jsx'
 
 export default function App() {
   return (
@@ -41,6 +42,9 @@ export default function App() {
             <NavLink to="/api-data" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
               API
             </NavLink>
+            <NavLink to="/remix" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+              Remix
+            </NavLink>
           </nav>
           <WalletButton />
         </header>
@@ -52,6 +56,7 @@ export default function App() {
             <Route path="/xdc" element={<XDCPage />} />
             <Route path="/cre" element={<CREPage />} />
             <Route path="/api-data" element={<ApiDataPage />} />
+            <Route path="/remix" element={<RemixPage />} />
           </Routes>
         </main>
         <footer className="app-footer">

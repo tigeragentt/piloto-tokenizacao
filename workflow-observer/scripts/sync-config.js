@@ -9,7 +9,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const envPath = resolve(__dirname, '../../.env')
 const env = {}
-for (const line of readFileSync(envPath, 'utf8').split('\n')) {
+for (const line of readFileSync(envPath, 'utf8').split(/\r?\n/)) {
   const m = line.match(/^([A-Z0-9_]+)\s*=\s*(.+)$/)
   if (m) env[m[1]] = m[2].trim()
 }
